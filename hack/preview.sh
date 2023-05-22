@@ -62,6 +62,32 @@ spec:
         authClientLibraryURL: $RHSSO_URL/auth/js/keycloak.js
         authClientPublicKeysURL: $RHSSO_URL/auth/realms/redhat-external/protocol/openid-connect/certs
 EOF
+
+    oc create -f - <<EOF
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: config
+objects:
+  - apiVersion: toolchain.dev.openshift.com/v1alpha1
+    kind: ProxyPlugin
+    metadata:
+      name: tekton-results
+      namespace: toolchain-host-operator
+    spec:
+      openShiftRouteTargetEndpoint:
+        namespace: tekton-results
+        name: tekton-results
+  - apiVersion: toolchain.dev.openshift.com/v1alpha1
+    kind: ProxyPlugin
+    metadata:
+      name: openshift-console
+      namespace: toolchain-host-operator
+    spec:
+      openShiftRouteTargetEndpoint:
+        name: console
+        namespace: openshift-console
+EOF
   fi
 fi
 
