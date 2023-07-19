@@ -118,8 +118,8 @@ jobs:
 
       - name: Create rollback branch
         run: |
-          git config user.name "prietyc123"
-          git config user.email "pkumari@redhat.com"
+          git config user.name "abc"
+          git config user.email "abc@gmail.com"
           git checkout -b rollback-${{ github.sha }}-$(date +%s)
           git revert -m 1 ${{ github.sha }}
 
