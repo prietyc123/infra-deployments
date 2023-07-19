@@ -1,0 +1,29 @@
+name: CI on Pull Request
+
+on:
+  pull_request:
+    paths:
+      - 'staging/**'
+
+jobs:
+  check-ci-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Curl
+        run: apk --no-cache add curl
+      - name: Check Staging CI Status
+        id: check-ci-status
+        run: |
+          while true; do
+            ci_status=$(curl -s -o /dev/null -w "%{http_code}" STAGING_CI_URL)
+            if [[ $ci_status == '200' ]]; then
+              echo "::set-output name=status::success"
+              break
+            elif [[ $ci_status != '404' ]]; then
+              echo "::set-output name=status::failed"
+              break
+            else
+              echo "E2E CI still in progress. Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done

@@ -1,0 +1,140 @@
+name: Staging e2e test
+
+on:
+  pull_request:
+    types:
+      - closed
+    paths:
+      - 'staging/**'
+
+jobs:
+  stage-e2e-test:
+    runs-on: self-hosted # Replace with your staging cluster runner
+
+    steps:
+      - name: Login to argocd
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_SA_TOKEN: ${{ secrets.ARGOCDSA_TOKEN }}
+        run: |
+          # Get the ArgoCD server and token from environment variables
+          argocd_server="${{ env.ARGOCD_SERVER }}"
+          argocd_sa_token="${{ env.ARGOCD_SA_TOKEN }}"
+
+          # Login to ArgoCD using the service account token
+          argocd login --insecure --server $argocd_server --auth-token $argocd_sa_token
+      - name: Sync the required app to the staging
+        run: |
+          # trigger the deployment
+          argocd app sync APP_NAME
+      - name: Check apps are health and synced
+        run: |
+          # Check the health and sync status of all ArgoCD applications for 3 minutes
+          timeout=180
+          interval=15
+          endtime=$(($(date +%s) + $timeout))
+
+          while [[ $(date +%s) -lt $endtime ]]; do
+            app_status=$(argocd app list -o json | jq -r '.items[].health.status')
+            app_sync_status=$(argocd app list -o json | jq -r '.items[].sync.status')
+
+            # check if all apps are healthy and synced
+            all_apps_healthy=true
+            all_apps_synced=true
+
+            for status in $app_status; do
+              if [[ $status != "Healthy" ]]; then
+                all_apps_healthy=false
+                break
+              fi
+            done
+
+            for sync_status in $app_sync_status; do
+              if [[ $sync_status != "Synced" ]]; then
+                all_apps_synced=false
+                break
+              fi
+            done
+
+            if [[ $all_apps_healthy == "true" && $all_apps_synced == "true" ]]; then
+              echo "All apps are healthy and synced."
+              exit 0
+            fi
+
+            sleep $interval
+          done
+
+          echo "Timed out. Some apps are not healthy or synced."
+          exit 1
+      - name: clone RHTAP e2e repository
+        run: |
+          # Clone the e2e-tests repository
+          git clone https://github.com/redhat-appstudio/e2e-tests.git
+
+          # Change directory to the cloned repository
+          cd e2e-tests
+      - name: Run e2e test on staging
+        id: e2e-test
+        run: |
+          # Retry the e2e test command once, if failed
+          for attempt in 1 2; do
+            make ci/test/smoke-e2e && break || sleep 5
+          done
+        continue-on-error: true
+
+      - name: Check if e2e test succeeded
+        run: |
+          if [[ ${{ steps.e2e-test.outcome }} == 'success' ]]; then
+            echo "E2E test succeeded."
+            exit 0
+          else
+            echo "E2E test failed."
+            exit 1
+          fi
+  slack_notification:
+    needs: stage-e2e-test
+    if: ${{ failure() && needs.stage-e2e-test.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack on failure
+        uses: slack/github-action@v3.2.0
+        with:
+          status: ${{ job.status }}
+          author: ${{ github.actor }}
+          message: "The e2e test on staging failed for pull request: ${{ github.event.pull_request.number }}"
+          fields: repo,message,commit,action,workflow,job,env
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+  rollback-on-failure:
+    needs: stage-e2e-test
+    if: ${{ failure() && needs.stage-e2e-test.result == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch pull request branch
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Create rollback branch
+        run: |
+          git config user.name "prietyc123"
+          git config user.email "pkumari@redhat.com"
+          git checkout -b rollback-${{ github.sha }}-$(date +%s)
+          git revert -m 1 ${{ github.sha }}
+
+      - name: Commit and push changes
+        run: |
+          git add .
+          git commit -m "Rollback changes for failed e2e test"
+          git push origin rollback-${{ github.sha }}-$(date +%s)
+
+      - name: Create rollback pull request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Rollback changes for failed e2e test"
+          title: "Rollback changes for failed e2e test"
+          branch: "rollback-${{ github.sha }}-$(date +%s)"
+          base: ${{ github.base_ref }}
+          body: "rollback pull request to reverse the changes of the failed e2e test on staging."
