@@ -1,0 +1,98 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: staging-hac-e2e-test
+spec:
+  params:
+    - name: git_url
+    - name: revision
+    - name: pull_request_title
+    - name: SEND_SLACK_NOTIFICATION
+      description: sends failed message to slack if the param is set to True/true
+      default: "false"
+  workspaces:
+    - name: git
+  tasks:
+    - name: staging-argocd-login
+      taskRef:
+        name: login-argocd
+    - name: clone-infra-deployment-git
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.git_url)
+        - name: deleteExisting
+          value: "true"
+        - name: revision
+          value: "POCPromotionToProd"
+      workspaces:
+      - name: output
+        workspace: git
+        subPath: infra-deployment-git
+      timeout: 10m
+    - name: staging-argocd-app-sync
+      taskRef:
+        name: app-sync
+      params:
+        - name: pull_request_title
+          value: $(params.pull_request_title)
+      runAfter:
+        - staging-argocd-login
+        - clone-infra-deployment-git
+      workspaces:
+      - name: infra-deployment-git
+        workspace: git
+        subPath: infra-deployment-git
+    - name: argocd-app-synced-healthy
+      taskRef:
+        name: argocd-app-health-check
+      runAfter:
+        - staging-argocd-app-sync
+    - name: clone-hac-ui-e2e-git
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: 'https://github.com/openshift/hac-dev.git'
+        - name: deleteExisting
+          value: "true"
+        - name: revision
+          value: "main"
+      workspaces:
+      - name: output
+        workspace: git
+        subPath: hac-ui-e2e-git
+      timeout: 10m
+    - name: hac-ui-e2e-test
+      taskRef:
+        name: hac-ui-e2e-test
+      params:
+      - name: TASK_RETRIES
+        value: "$(context.pipelineTask.retries)"
+      workspaces:
+      - name: hac-ui-e2e-git
+        workspace: git
+        subPath: hac-ui-e2e-git
+      runAfter:
+        - argocd-app-synced-healthy
+        - clone-hac-ui-e2e-git
+      when:
+        - input: $(tasks.argocd-app-synced-healthy.status)
+          operator: in
+          values: ["Succeeded"]
+  finally:
+    - name: send-slack-notification
+      taskRef:
+        name: send-slack-notification
+      params:
+        - name: MESSAGE
+          value: |
+            <icon> Staging e2e pipeline run <pr_name> *<run_status>* <icon> <<logs_url>|logs> <tag_ic>
+      when:
+        - input: $(tasks.hac-ui-e2e-test.status)
+          operator: in
+          values: ["Failed"]
+        - input: $(params.SEND_SLACK_NOTIFICATION)
+          operator: in
+          values: ["true"]
