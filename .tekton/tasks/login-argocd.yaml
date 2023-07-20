@@ -1,0 +1,37 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: login-argocd
+spec:
+  description: >-
+    This task is for login into the staging cluster argocd environment 
+  params:
+    - name: ARGOCD_SA_TOKEN
+      type: string
+      description: The secret name where you have stored the staging argocd service account token, it expects the key of the secret to be `argocd_sa_token`
+      default: argocd-sa-token
+    - name: ARGOCD_SERVER_URL
+      type: string
+      description: The secret name where you have stored the staging argocd server url, it expects the key of the secret to be `argocd_server_url`
+      default: argocd-server-url
+  steps:
+    - name: argocd-staging-login
+      image: quay.io/devtools_gitops/test_image:4.0.5
+      script: |
+        #!/usr/bin/env sh
+        set -u -o pipefail
+
+        echo "Login into argocd"
+        argocd login --insecure --server ${URL} --auth-token ${TOKEN}
+      env:
+        - name: TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: $(params.ARGOCD_SA_TOKEN)
+              key: argocd_sa_token
+        - name: URL
+          valueFrom:
+            secretKeyRef:
+              name: $(params.ARGOCD_SERVER_URL)
+              key: argocd_server_url
+

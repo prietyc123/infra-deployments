@@ -1,0 +1,86 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: argocd-app-health-check
+spec:
+  description: >-
+    This task is for checking the health of the staging argocd app
+  steps:
+    - name: check-application-status
+      image: quay.io/devtools_gitops/test_image:4.0.5
+      script: |
+        #!/usr/bin/env sh
+        set -u -o pipefail
+
+        # Check the health and sync status of all ArgoCD applications for 3 minutes
+        timeout=300
+        interval=15
+        endtime=$(($(date +%s) + $timeout))
+
+        while [[ $(date +%s) -lt $endtime ]]; do
+          app_status=$(argocd app list -o json | jq -r '.items[].health.status')
+          app_sync_status=$(argocd app list -o json | jq -r '.items[].sync.status')
+
+          # check if all apps are healthy and synced
+          all_apps_healthy=true
+          all_apps_synced=true
+
+          for status in $app_status; do
+            if [[ $status != "Healthy" ]]; then
+              all_apps_healthy=false
+              break
+            fi
+          done
+
+          for sync_status in $app_sync_status; do
+            if [[ $sync_status != "Synced" ]]; then
+              all_apps_synced=false
+              break
+            fi
+          done
+
+          if [[ $all_apps_healthy == "true" && $all_apps_synced == "true" ]]; then
+            echo "All apps are healthy and synced."
+            exit 0
+          fi
+
+          sleep $interval
+        done
+
+        echo "Timed out. Some apps are not healthy or synced."
+        exit 1
+    - name: check-controlplane-pod-status
+      image: quay.io/devtools_gitops/test_image:4.0.5
+      script: |
+        #!/usr/bin/env sh
+        set -u -o pipefail
+
+        check_crashlooping_pods() {
+          local ns="$1"
+          local crashlooping_pods
+
+          printf "checking for crashlooping pods in namsespace: %s\n" "$ns"
+          crashlooping_pods=$(kubectl get pods -n "$ns" --field-selector=status.phase!=Running -o jsonpath='{range .items[?(@.status.containerStatuses[*].state.waiting.reason=="CrashLoopBackOff")]}{.metadata.name}{","}{end}' 2>/dev/null)
+
+          # Check if the any crashlooping pods found
+          if [[ -n $crashlooping_pods ]]; then
+            printf ", CrashLoopBackOff error in namespace: %s\n" "$ns"      
+            IFS=',' read -ra pods <<< "$crashlooping_pods"
+            for pod in "${pods[@]}"; do
+              kubectl get pod "$pod" -n "$ns"
+              kubectl logs "$pod" -n "$ns"
+            done
+            exit 1
+          else
+            printf ", Running\n"
+          fi
+        }
+
+        printf -- "- Checking pods status for controlplane namespaces\n"
+        # list of control plane namespaces
+        CONTROL_PLANE_NS=("openshift-apiserver" "openshift-controller-manager" "openshift-etcd" "openshift-ingress" "openshift-kube-apiserver" "openshift-kube-controller-manager" "openshift-kube-scheduler")
+        for ns in "${CONTROL_PLANE_NS[@]}"; do
+          check_crashlooping_pods "$ns" | indent 4
+        done
+
+      
