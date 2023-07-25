@@ -63,6 +63,7 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "1"
     pipelinesascode.tekton.dev/max-keep-run-upper-limit: "1"
 spec:
+  concurrency_limit: 1
   params:
     # The variable with brackets are special to Pipelines as Code
     # They will automatically be expanded with the events from Github.
