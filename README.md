@@ -1,4 +1,4 @@
-# StoneSoup Infrastructure Deployments1234 test
+# StoneSoup Infrastructure Deployments1234 t
 
 For the full documentation click [here](https://redhat-appstudio.github.io/infra-deployments/docs/introduction/about.html)
 
