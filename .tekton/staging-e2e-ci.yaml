@@ -61,6 +61,7 @@ metadata:
 
     # how many runs we want to keep attached to this event
     pipelinesascode.tekton.dev/max-keep-runs: "1"
+    pipelinesascode.tekton.dev/max-keep-run-upper-limit: "1"
 spec:
   params:
     # The variable with brackets are special to Pipelines as Code
