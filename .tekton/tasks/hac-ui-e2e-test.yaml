@@ -16,8 +16,8 @@ spec:
       image: quay.io/hacdev/hac-tests:next
       workingDir: $(workspaces.hac-ui-e2e-git.path)
       script: |
-        #!/usr/bin/env sh
-        set -u -o pipefail
+        #!/usr/bin/env bash
+        set -e -u -o pipefail
 
         export CYPRESS_HAC_BASE_URL="https://console.dev.redhat.com/preview/application-pipeline"
         export CYPRESS_USERNAME=user1
