@@ -12,10 +12,14 @@ spec:
       default: "false"
   workspaces:
     - name: git
+    - name: shared-workspace
   tasks:
     - name: staging-argocd-login
       taskRef:
         name: login-argocd
+      workspaces:
+        - name: output
+          workspace: shared-workspace
     - name: clone-infra-deployment-git
       taskRef:
         name: git-clone
@@ -37,16 +41,22 @@ spec:
       params:
         - name: pull_request_title
           value: $(params.pull_request_title)
+        # - name: argocd_config
+        #   value: $(tasks.staging-argocd-login.results.argocd-config)
+      workspaces:
+        - name: argocd-config
+          workspace: shared-workspace
       runAfter:
         - staging-argocd-login
-        - clone-infra-deployment-git
-      workspaces:
-      - name: infra-deployment-git
-        workspace: git
-        subPath: infra-deployment-git
     - name: argocd-app-synced-healthy
       taskRef:
         name: argocd-app-health-check
+      # params:
+      #   - name: argocd_config
+      #     value: $(tasks.staging-argocd-login.results.argocd-config)
+      workspaces:
+        - name: argocd-config
+          workspace: shared-workspace
       runAfter:
         - staging-argocd-app-sync
     - name: clone-hac-ui-e2e-git
