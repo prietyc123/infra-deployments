@@ -10,36 +10,30 @@ spec:
       type: string
       description: Title of the pull request which has been merged to be deployed on RHTAP staging environment
       default: ""
-  workspaces:
-    - name: infra-deployment-git
+    - name: argocd_config
+  results:
+    - name: app-name
+      description: Name of the app to be synced
   steps:
     - name: argocd-app-sync
       image: quay.io/devtools_gitops/test_image:4.0.5
-      workingDir: $(workspaces.infra-deployment-git.path)
+      env:
+        - name: ARGOCD_CONFIG
+          value: $(params.argocd_config)
       script: |
-        #!/usr/bin/env python3
-        import subprocess
+        #!/usr/bin/env sh
+        set -u -o pipefail
 
-        cmd = "pip3 install pyyaml"
-        output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = output.communicate()
+        for i in $(argocd app list --config "${ARGOCD_CONFIG}"); do
+          app_name = $(echo $(params.pull_request_title) | grep -o "\b$i\b")
+          if [ -n $app_name ]; then
+            echo "trigger the deployment"
+            argocd app sync $app_name --config "${ARGOCD_CONFIG}"
+            echo $app_name | tee $(results.app-name.path)
+            break
+          fi
+        done
 
-        # Load param config versions
-        with open('argocd-staging-app.yaml') as f:
-          import yaml
-          app = yaml.safe_load(f)
-        
-        # Function to check if the element is present in pull-request-title
-        def contains_app(element):
-            return element in $(params.pull_request_title)
-
-        # Find the matching application
-        matched_app_name = next((element for element in app if contains_app(element)), None)
-
-        if matched_app_name:
-          app_name = ', '.join(matched_app_name)
-          echo "trigger the deployment"
-          argocd app sync app_name
-        else:
-          print("Either the app has not been added to staging yet or argocd-staging-app.yaml file does not have information of the app")
-
+        if [ -z $app_name ]; then
+          echo "app not found in the argocd"
+        fi

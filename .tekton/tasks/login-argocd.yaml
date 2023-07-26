@@ -6,14 +6,14 @@ spec:
   description: >-
     This task is for login into the staging cluster argocd environment 
   params:
-    - name: ARGOCD_SA_TOKEN
+    - name: ARGOCD_SERVER
       type: string
-      description: The secret name where you have stored the staging argocd service account token, it expects the key of the secret to be `argocd_sa_token`
-      default: argocd-sa-token
-    - name: ARGOCD_SERVER_URL
-      type: string
-      description: The secret name where you have stored the staging argocd server url, it expects the key of the secret to be `argocd_server_url`
-      default: argocd-server-url
+      description: The secret name where you have stored the staging argocd server details `argocd_server`
+      default: argocd-server
+  results:
+    - name: argocd-config
+  workspaces:
+    - name: output
   steps:
     - name: argocd-staging-login
       image: quay.io/devtools_gitops/test_image:4.0.5
@@ -22,16 +22,23 @@ spec:
         set -u -o pipefail
 
         echo "Login into argocd"
-        argocd login --insecure --server ${URL} --auth-token ${TOKEN}
+        argocd login --insecure ${URL} --password ${PASSWORD} --username ${USERNAME} --config $(workspaces.output.path)/argocd-config
+
+        cat "$(workspaces.output.path)/argocd-config" | tee $(results.argocd-config.path)
+
       env:
-        - name: TOKEN
+        - name: PASSWORD
           valueFrom:
             secretKeyRef:
-              name: $(params.ARGOCD_SA_TOKEN)
-              key: argocd_sa_token
+              name: $(params.ARGOCD_SERVER)
+              key: argocd_server_password
+        - name: USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: $(params.ARGOCD_SERVER)
+              key: argocd_server_username
         - name: URL
           valueFrom:
             secretKeyRef:
-              name: $(params.ARGOCD_SERVER_URL)
+              name: $(params.ARGOCD_SERVER)
               key: argocd_server_url
-

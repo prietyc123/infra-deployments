@@ -5,9 +5,14 @@ metadata:
 spec:
   description: >-
     This task is for checking the health of the staging argocd app
+  params:
+  - name: argocd_config
   steps:
     - name: check-application-status
       image: quay.io/devtools_gitops/test_image:4.0.5
+      env:
+        - name: ARGOCD_CONFIG
+          value: $(params.argocd_config)
       script: |
         #!/usr/bin/env sh
         set -u -o pipefail
@@ -18,8 +23,8 @@ spec:
         endtime=$(($(date +%s) + $timeout))
 
         while [[ $(date +%s) -lt $endtime ]]; do
-          app_status=$(argocd app list -o json | jq -r '.items[].health.status')
-          app_sync_status=$(argocd app list -o json | jq -r '.items[].sync.status')
+          app_status=$(argocd app list --config "${ARGOCD_CONFIG}" -o json | jq -r '.[] | .status.health.status')
+          app_sync_status=$(argocd app list --config "${ARGOCD_CONFIG}" -o json | jq -r '.[] | .sync.status')
 
           # check if all apps are healthy and synced
           all_apps_healthy=true
@@ -50,7 +55,7 @@ spec:
         echo "Timed out. Some apps are not healthy or synced."
         exit 1
     - name: check-controlplane-pod-status
-      image: quay.io/devtools_gitops/test_image:4.0.5
+      image: quay.io/openshift-pipeline/ci
       script: |
         #!/usr/bin/env sh
         set -u -o pipefail
@@ -60,15 +65,15 @@ spec:
           local crashlooping_pods
 
           printf "checking for crashlooping pods in namsespace: %s\n" "$ns"
-          crashlooping_pods=$(kubectl get pods -n "$ns" --field-selector=status.phase!=Running -o jsonpath='{range .items[?(@.status.containerStatuses[*].state.waiting.reason=="CrashLoopBackOff")]}{.metadata.name}{","}{end}' 2>/dev/null)
+          crashlooping_pods=$(oc get pods -n "$ns" --field-selector=status.phase!=Running -o jsonpath='{range .items[?(@.status.containerStatuses[*].state.waiting.reason=="CrashLoopBackOff")]}{.metadata.name}{","}{end}' 2>/dev/null)
 
           # Check if the any crashlooping pods found
           if [[ -n $crashlooping_pods ]]; then
             printf ", CrashLoopBackOff error in namespace: %s\n" "$ns"      
             IFS=',' read -ra pods <<< "$crashlooping_pods"
             for pod in "${pods[@]}"; do
-              kubectl get pod "$pod" -n "$ns"
-              kubectl logs "$pod" -n "$ns"
+              oc get pod "$pod" -n "$ns"
+              oc logs "$pod" -n "$ns"
             done
             exit 1
           else

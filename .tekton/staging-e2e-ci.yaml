@@ -4,7 +4,7 @@ metadata:
   generateName: staging-hac-e2e-
   annotations:
     pipelinesascode.tekton.dev/on-event: "[push]"
-    pipelinesascode.tekton.dev/on-target-branch: "[refs/heads/*]"
+    pipelinesascode.tekton.dev/on-target-branch: "[POCPromotionToProd]"
     pipelinesascode.tekton.dev/pipeline: "[.tekton/pipeline/staging-hac-ui-e2e.yaml]"
     pipelinesascode.tekton.dev/task: "[.tekton/tasks/login-argocd.yaml]"
     pipelinesascode.tekton.dev/task-1: "[.tekton/tasks/sync-argocd-app.yaml]"
@@ -20,7 +20,7 @@ spec:
     - name: revision
       value: "{{ revision }}"
     - name: pull_request_title
-      value: "{{ pull_request_title }}" 
+      value: "{{ event_title }}" 
   pipelineRef:
     name: staging-hac-e2e-test
   workspaces:
@@ -32,3 +32,11 @@ spec:
           resources:
             requests:
               storage: 1Gi
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Mi
