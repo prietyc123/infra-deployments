@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: get-app-name
+spec:
+  description: >-
+    This task is for getting the application name, change for staging environment
+  params:
+    - name: revision
+  workspaces:
+   - name: infra-deployment-git
+  results:
+   - name: merged-pr-title 
+  steps:
+    - name: get-merged-pr-title
+      image: quay.io/openshift-pipeline/ci
+      workingDir: $(workspaces.infra-deployment-git.path)
+      script: |
+        #!/usr/bin/env sh
+        set -u -o pipefail
+
+        git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
+        git log --format=%B -n 1 $(params.revision) | tr -d '\n' | tee $(results.merged-pr-title.path)
+        
+
