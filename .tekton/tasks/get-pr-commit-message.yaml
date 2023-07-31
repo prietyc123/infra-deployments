@@ -20,5 +20,4 @@ spec:
         set -u -o pipefail
 
         git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
-        output=$(git log -m -1 --name-only --pretty="format:"  $(params.revision))
-        echo "${output}" | tee $(results.merged-pr-files-changed.path)
+        git diff --name-only $(params.revision)^ $(params.revision) | tee $(results.merged-pr-files-changed.path)
