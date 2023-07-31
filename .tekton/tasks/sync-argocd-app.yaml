@@ -6,7 +6,7 @@ spec:
   description: >-
     This task is for syncing the staging cluster argocd application
   params:
-    - name: pull_request_title
+    - name: pull_request_files
       type: string
       description: Title of the pull request which has been merged to be deployed on RHTAP staging environment
       default: ""
@@ -20,8 +20,8 @@ spec:
       image: quay.io/devtools_gitops/test_image:4.0.5
       workingDir: $(workspaces.argocd-config.path)
       env:
-        - name: PULL_REQUEST_TITLE
-          value: $(params.pull_request_title)
+        - name: PULL_REQUEST_FILES
+          value: $(params.pull_request_files)
       script: |
         #!/usr/bin/env sh
         set -u -o pipefail
@@ -29,7 +29,7 @@ spec:
         chmod 0400 "$(pwd)/argocdconfig"
         declare app_name=
         for i in $(argocd app list --config "$(pwd)/argocdconfig" -o json | jq -r '.[] | .metadata.name'); do
-          app_name=$(echo $PULL_REQUEST_TITLE | grep -o "\b$i\b")
+          app_name=$(echo "$PULL_REQUEST_FILES" | grep -o "\b$i\b" | uniq)
           if [ "$app_name" != "" ]; then
             echo "trigger the deployment for $app_name"
             argocd app sync $app_name --config "$(pwd)/argocdconfig"
