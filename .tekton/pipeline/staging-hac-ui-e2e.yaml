@@ -29,6 +29,8 @@ spec:
           value: "true"
         - name: revision
           value: "POCPromotionToProd"
+        - name: depth
+          value: "3"
       workspaces:
       - name: output
         workspace: git
