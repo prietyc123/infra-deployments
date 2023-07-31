@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: get-commit-message
+  name: get-pr-changed-files
 spec:
   description: >-
     This task is for getting the application name, change for staging environment
@@ -10,9 +10,9 @@ spec:
   workspaces:
    - name: infra-deployment-git
   results:
-   - name: merged-pr-title 
+   - name: merged-pr-files-changed
   steps:
-    - name: get-merged-pr-title
+    - name: get-merged-pr-files-changed
       image: quay.io/openshift-pipeline/ci
       workingDir: $(workspaces.infra-deployment-git.path)
       script: |
@@ -20,6 +20,4 @@ spec:
         set -u -o pipefail
 
         git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
-        git log --format=%B -n 1 $(params.revision) | tr -d '\n' | tee $(results.merged-pr-title.path)
-        
-
+        git diff --name-only $(params.revision)^..$(params.revision) | tee $(results.merged-pr-files-changed.path)
