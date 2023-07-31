@@ -34,9 +34,9 @@ spec:
         workspace: git
         subPath: infra-deployment-git
       timeout: 10m
-    - name: get-updated-application-name
+    - name: get-pr-changed-files-path
       taskRef:
-        name: get-commit-message
+        name: get-pr-changed-files
       params:
         - name: revision
           value: $(params.revision)
@@ -50,13 +50,13 @@ spec:
       taskRef:
         name: app-sync
       params:
-        - name: pull_request_title
-          value: $(tasks.get-updated-application-name.results.merged-pr-title)
+        - name: pull_request_files
+          value: $(tasks.get-pr-changed-files-path.results.merged-pr-files-changed)
       workspaces:
         - name: argocd-config
           workspace: shared-workspace
       runAfter:
-        - get-updated-application-name
+        - get-pr-changed-files-path
         - staging-argocd-login
     - name: argocd-app-synced-healthy
       taskRef:
