@@ -97,6 +97,24 @@ spec:
         - argocd-app-synced-healthy
         - clone-hac-ui-e2e-git
   finally:
+    - name: rollback-argocd-app
+      taskRef:
+        name: rollback-argocd-app
+      params:
+        - name: revision
+          value: $(params.revision)
+        - name: app-name
+          value: $(tasks.staging-argocd-app-sync.results.app-name)
+      workspaces:
+        - name: argocd-config
+          workspace: shared-workspace
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      when:
+        - input: $(tasks.hac-ui-e2e-test.status)
+          operator: in
+          values: ["Failed"]
     - name: send-slack-notification
       taskRef:
         name: send-slack-notification
