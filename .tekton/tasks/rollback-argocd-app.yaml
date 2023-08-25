@@ -1,0 +1,66 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rollback-argocd-app
+spec:
+  description: >-
+    This task is for rollback the failed application in the staging environment, except the operator rollback
+  params:
+    - name: revision
+    - name: app-name
+      type: string
+      description: application needs rollback in RHTAP staging environment
+      default: ""
+  workspaces:
+   - name: argocd-config
+   - name: infra-deployment-git
+  steps:
+    - name: operator-upgrade
+      image: quay.io/openshift-pipeline/ci
+      workingDir: $(workspaces.infra-deployment-git.path)
+      env:
+        - name: APP_NAME
+          value: $(params.app-name)
+      script: |
+        #!/usr/bin/env sh
+        set -u -o pipefail
+
+        filePath=$(find "$(pwd)/components/${APP_NAME}/staging" -name staging-build.yaml | head -n 1)
+
+        echo "check whether the application has operator upgrade"
+        if [ $(git diff $(params.revision)^ $(params.revision) -- $filePath | grep -qE '^-.*channel:|^\+.*channel:') ]; then
+          echo "Rollback is not possible for operator upgrade"
+          exit 1
+        fi
+        exit 0
+    - name: argocd-app-rollback
+      image: quay.io/devtools_gitops/test_image:4.0.5
+      workingDir: $(workspaces.argocd-config-git.path)
+      env:
+        - name: APP_NAME
+          value: $(params.app-name)
+      script: |
+        #!/usr/bin/env sh
+        set -u -o pipefail
+
+        ROLLBACK_TIMEOUT=300
+
+        if [ "$(cat $(steps.step-run.exitCode.path))" == "0" ]; then
+          echo "rollback the application: ${APP_NAME}"
+          chmod 0400 "$(pwd)/argocdconfig"
+          rollback_output=$(timeout $ROLLBACK_TIMEOUT argocd app rollback $app_name --config "$(pwd)/argocdconfig" 2>&1)
+          if [[ $rollback_output == *"Failed to rollback application"*"Application has no history"* ]]; then
+            echo "Rollback failed: Application has no history."
+            exit 1
+          elif [[ $rollback_output == *"Operation cannot be completed"* ]]; then
+            echo "Rollback failed for an unknown reason."
+            exit 1
+          else
+            echo "$rollback_output"
+            echo "Rollback successful."
+            exit 0
+          fi
+        else
+          echo "Marking this step as FAIL as previous step was failed."
+          exit 1
+        fi
