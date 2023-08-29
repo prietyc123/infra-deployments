@@ -25,7 +25,7 @@ spec:
         #!/usr/bin/env sh
         set -u -o pipefail
 
-        filePath=$(find "$(pwd)/components/${APP_NAME}/staging" -name staging-build.yaml | head -n 1)
+        filePath=$(find "$(pwd)/components/${APP_NAME}/development" -name dev-build.yaml | head -n 1)
 
         echo "check whether the application has operator upgrade"
         if [ $(git diff $(params.revision)^ $(params.revision) -- $filePath | grep -qE '^-.*channel:|^\+.*channel:') ]; then
@@ -48,7 +48,7 @@ spec:
         if [ "$(cat $(steps.step-run.exitCode.path))" == "0" ]; then
           echo "rollback the application: ${APP_NAME}"
           chmod 0400 "$(pwd)/argocdconfig"
-          rollback_output=$(timeout $ROLLBACK_TIMEOUT argocd app rollback $app_name --config "$(pwd)/argocdconfig" 2>&1)
+          rollback_output=$(timeout $ROLLBACK_TIMEOUT argocd app rollback $app_name --config "$(pwd)/argocdconfig" --grpc-web 2>&1)
           if [[ $rollback_output == *"Failed to rollback application"*"Application has no history"* ]]; then
             echo "Rollback failed: Application has no history."
             exit 1

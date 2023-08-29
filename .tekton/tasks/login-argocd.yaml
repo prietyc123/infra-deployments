@@ -23,7 +23,7 @@ spec:
         set -u -o pipefail
 
         echo "Login into argocd"
-        argocd login --insecure ${URL} --password ${PASSWORD} --username ${USERNAME} --config "$(pwd)/argocdconfig"
+        argocd login --insecure ${URL} --password ${PASSWORD} --username ${USERNAME} --config "$(pwd)/argocdconfig" --grpc-web
       env:
         - name: PASSWORD
           valueFrom:
