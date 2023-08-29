@@ -28,7 +28,7 @@ spec:
         - name: deleteExisting
           value: "true"
         - name: revision
-          value: "POCPromotionToProd"
+          value: "preview-POCPromotionToProd"
         - name: depth
           value: "3"
       workspaces:
@@ -51,12 +51,12 @@ spec:
     - name: staging-argocd-app-sync
       taskRef:
         name: app-sync
-      params:
-        - name: pull_request_files
-          value: $(tasks.get-pr-changed-files-path.results.merged-pr-files-changed)
       workspaces:
         - name: argocd-config
           workspace: shared-workspace
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
       runAfter:
         - get-pr-changed-files-path
         - staging-argocd-login
@@ -103,8 +103,6 @@ spec:
       params:
         - name: revision
           value: $(params.revision)
-        - name: app-name
-          value: $(tasks.staging-argocd-app-sync.results.app-name)
       workspaces:
         - name: argocd-config
           workspace: shared-workspace

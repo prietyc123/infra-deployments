@@ -10,8 +10,6 @@ spec:
       type: string
       description: The secret name where you have stored the staging argocd server details `argocd_server`
       default: argocd-server
-  # results:
-  #   - name: argocd-config
   workspaces:
     - name: output
   steps:
@@ -23,7 +21,7 @@ spec:
         set -u -o pipefail
 
         echo "Login into argocd"
-        argocd login --insecure ${URL} --password ${PASSWORD} --username ${USERNAME} --config "$(pwd)/argocdconfig"
+        argocd login --insecure ${URL} --password ${PASSWORD} --username ${USERNAME} --config "$(pwd)/argocdconfig" --grpc-web
       env:
         - name: PASSWORD
           valueFrom:
