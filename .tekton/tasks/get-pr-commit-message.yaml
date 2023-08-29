@@ -4,13 +4,11 @@ metadata:
   name: get-pr-changed-files
 spec:
   description: >-
-    This task is for getting the application name, change for staging environment
+    This task is for getting the all the files changed for pull request
   params:
     - name: revision
   workspaces:
    - name: infra-deployment-git
-  results:
-   - name: merged-pr-files-changed
   steps:
     - name: get-merged-pr-files-changed
       image: quay.io/openshift-pipeline/ci
@@ -20,4 +18,4 @@ spec:
         set -u -o pipefail
 
         git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
-        git diff --name-only $(params.revision)^ $(params.revision) | tee $(results.merged-pr-files-changed.path)
+        git diff --name-only $(params.revision)^ $(params.revision) > updated_files.txt

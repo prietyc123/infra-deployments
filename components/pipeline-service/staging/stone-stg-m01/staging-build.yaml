@@ -874,17 +874,6 @@ metadata:
 ---
 apiVersion: v1
 data:
-  application-name: Pipelines as Code CI
-kind: ConfigMap
-metadata:
-  annotations:
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
-    argocd.argoproj.io/sync-wave: "0"
-  name: pipelines-as-code
-  namespace: openshift-pipelines
----
-apiVersion: v1
-data:
   config.env: |
     DB_USER=
     DB_PASSWORD=
@@ -1112,10 +1101,7 @@ spec:
     protocol: TCP
     targetPort: 9090
   selector:
-    app.kubernetes.io/component: controller
-    app.kubernetes.io/instance: default
-    app.kubernetes.io/name: controller
-    app.kubernetes.io/part-of: tekton-chains
+    app: tekton-chains-controller
 ---
 apiVersion: v1
 kind: Service
@@ -1201,7 +1187,7 @@ spec:
         app: pipeline-metrics-exporter
     spec:
       containers:
-      - image: quay.io/redhat-appstudio/pipeline-service-exporter:46a602d3cf1d7054f391e3b41042d6e9787272e9
+      - image: quay.io/redhat-appstudio/pipeline-service-exporter:7c56cdd830d62b3dfe7b773a70344122deb82e34
         name: pipeline-metrics-exporter
         ports:
         - containerPort: 9117
@@ -1736,6 +1722,23 @@ spec:
   selector:
     matchLabels:
       app: pipeline-metrics-exporter
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    argocd.argoproj.io/sync-wave: "1"
+  name: tekton-chains-controller
+  namespace: openshift-pipelines
+spec:
+  endpoints:
+  - path: /metrics
+    port: metrics
+    scheme: http
+  selector:
+    matchLabels:
+      app: tekton-chains-controller
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

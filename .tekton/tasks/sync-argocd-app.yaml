@@ -5,39 +5,73 @@ metadata:
 spec:
   description: >-
     This task is for syncing the staging cluster argocd application
-  params:
-    - name: pull_request_files
-      type: string
-      description: Files changed in the pull request which has been merged to be deployed on RHTAP staging environment
-      default: ""
+  # params:
+  #   - name: pull_request_files
+  #     type: array
+  #     description: Files changed in the pull request which has been merged to be deployed on RHTAP staging environment
+  #     default: ""
   results:
     - name: app-name
       description: Name of the app to be synced
   workspaces:
    - name: argocd-config
+   - name: infra-deployment-git
   steps:
     - name: argocd-app-sync
       image: quay.io/devtools_gitops/test_image:4.0.5
       workingDir: $(workspaces.argocd-config.path)
-      env:
-        - name: PULL_REQUEST_FILES
-          value: $(params.pull_request_files)
       script: |
-        #!/usr/bin/env sh
-        set -u -o pipefail
+        #!/usr/bin/env python3
+        import subprocess
+        import re
+        import os
 
-        chmod 0400 "$(pwd)/argocdconfig"
-        declare app_name=
-        for i in $(argocd app list --config "$(pwd)/argocdconfig" -o json | jq -r '.[] | .metadata.name'); do
-          app_name=$(echo "$PULL_REQUEST_FILES" | grep -o "\b$i\b" | uniq)
-          if [ "$app_name" != "" ]; then
-            echo "trigger the deployment for $app_name"
-            argocd app sync $app_name --config "$(pwd)/argocdconfig"
-            echo $app_name | tee $(results.app-name.path)
-            break
-          fi
-        done
+        cmd = "pip3 install pyyaml"
+        output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = output.communicate()
 
-        if [ -z $app_name ]; then
-          echo "application not deployed yet in the argocd"
-        fi
+        # Load applications file
+        with open('$(workspaces.infra-deployment-git.path)/app.yaml') as f:
+          import yaml
+          app = yaml.safe_load(f)
+
+        keys_pattern = r"\b(" + "|".join(re.escape(key) for key in app.keys()) + r")\b"
+
+        # Print the list of file paths
+        matches = []
+        for file in open('$(workspaces.infra-deployment-git.path)/updated_files.txt').readlines():
+          file = file.strip()
+          path_matches = re.findall(keys_pattern, file)
+          matches.extend(path_matches)
+
+        # Find matches in pull request files
+        unique_matches = set(matches)
+
+        # Get the current working directory
+        current_dir = os.getcwd()
+
+        def update_app_path(app_path, app_name):
+          with open(app_path, "a") as f:
+            f.write(app_name + "\n")
+
+        if not unique_matches:
+            print("No matching components found in pull request files. Add them to the app.yaml file.")
+        else:
+            for match in unique_matches:
+                for app_name in app.get(match, []):
+                    # Run the argocd command using subprocess
+                    cmd = ["chmod", "0400", f"{current_dir}/argocdconfig"]
+                    cmd_string = " ".join(cmd)
+                    output = subprocess.Popen(cmd_string.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    stdout, stderr = output.communicate()
+                    try:
+                        print(f"trigger the deployment for {app_name}")
+                        cmd = ["argocd", "app", "sync", app_name, "--config", f"{current_dir}/argocdconfig", "--grpc-web"]
+                        cmd_string = " ".join(cmd)
+                        output = subprocess.Popen(cmd_string.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        stdout, stderr = output.communicate()
+                        update_app_path("$(workspaces.infra-deployment-git.path)/component.txt", match + ":" + app_name)
+                        if output.returncode != 0:
+                            print(f"Error occurred: {stderr.decode('utf-8')}")
+                    except Exception as e:
+                        print(f"An error occurred: {e}")
