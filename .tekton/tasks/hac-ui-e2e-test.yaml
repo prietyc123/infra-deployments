@@ -20,6 +20,7 @@ spec:
         set -e -u -o pipefail
 
         echo "hello test"
+        exit 1
 
         # export CYPRESS_HAC_BASE_URL="https://console.dev.redhat.com/preview/application-pipeline"
         # export CYPRESS_USERNAME=user1
