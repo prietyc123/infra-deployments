@@ -25,7 +25,7 @@ spec:
         #!/usr/bin/env sh
         set -u -o pipefail
 
-        filePath=$(find "$(pwd)/components/${APP_NAME}/staging" -name staging-build.yaml | head -n 1)
+        filePath=$(find "$(pwd)/components/${APP_NAME}/development" -name dev-build.yaml | head -n 1)
 
         echo "check whether the application has operator upgrade"
         if [ $(git diff $(params.revision)^ $(params.revision) -- $filePath | grep -qE '^-.*channel:|^\+.*channel:') ]; then
