@@ -1,0 +1,43 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: staging-hac-e2e-
+  annotations:
+    pipelinesascode.tekton.dev/on-event: "[push]"
+    pipelinesascode.tekton.dev/on-target-branch: "[preview-POCPromotionToProd]"
+    pipelinesascode.tekton.dev/pipeline: "[.tekton/pipeline/staging-hac-ui-e2e.yaml]"
+    pipelinesascode.tekton.dev/task: "[.tekton/tasks/login-argocd.yaml]"
+    pipelinesascode.tekton.dev/task-1: "[.tekton/tasks/sync-argocd-app.yaml]"
+    pipelinesascode.tekton.dev/task-2: "[.tekton/tasks/hac-ui-e2e-test.yaml]"
+    pipelinesascode.tekton.dev/task-3: "[.tekton/tasks/check-app-health.yaml]"
+    pipelinesascode.tekton.dev/task-4: "[.tekton/tasks/send-slack-notification.yaml]"
+    pipelinesascode.tekton.dev/task-5: "[.tekton/tasks/get-pr-commit-message.yaml]"
+    pipelinesascode.tekton.dev/task-6: "[.tekton/tasks/rollback-argocd-app.yaml]"
+    pipelinesascode.tekton.dev/task-7: "[.tekton/tasks/create-rollback-mr.yaml]"
+    pipelinesascode.tekton.dev/task-8: "[git-clone]"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+spec:
+  params:
+    - name: repo_url
+      value: "{{ repo_url }}"
+    - name: revision
+      value: "{{ revision }}"
+  pipelineRef:
+    name: staging-hac-e2e-test
+  workspaces:
+    - name: git
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Mi
