@@ -28,7 +28,7 @@ spec:
         - name: deleteExisting
           value: "true"
         - name: revision
-          value: "preview-POCPromotionToProd"
+          value: $(params.revision)
         - name: depth
           value: "3"
       workspaces:
@@ -106,6 +106,20 @@ spec:
       workspaces:
         - name: argocd-config
           workspace: shared-workspace
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      when:
+        - input: $(tasks.hac-ui-e2e-test.status)
+          operator: in
+          values: ["Failed"]
+    - name: create-rollback-mr
+      taskRef:
+        name: create-rollback-mr
+      params:
+        - name: REVISION
+          value: $(params.revision)
+      workspaces:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git

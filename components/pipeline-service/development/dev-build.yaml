@@ -250,6 +250,70 @@ kind: ClusterRole
 metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: pipeline-maintainer
+rules:
+- apiGroups:
+  - operators.coreos.com
+  resources:
+  - installplans
+  verbs:
+  - get
+  - list
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resourceNames:
+  - pipeline
+  resources:
+  - serviceaccounts
+  verbs:
+  - patch
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+- apiGroups:
+  - tekton.dev
+  resources:
+  - pipelineruns
+  verbs:
+  - '*'
+- apiGroups:
+  - results.tekton.dev
+  resources:
+  - results
+  - records
+  - logs
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/portforward
+  verbs:
+  - create
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
     argocd.argoproj.io/sync-wave: "0"
   name: pipeline-service-exporter-reader
 rules:
@@ -283,6 +347,68 @@ rules:
   - /metrics
   verbs:
   - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: pipeline-service-sre
+rules:
+- apiGroups:
+  - operators.coreos.com
+  resources:
+  - installplans
+  verbs:
+  - get
+  - list
+  - update
+  - patch
+- apiGroups:
+  - tekton.dev
+  resources:
+  - clustertasks
+  - conditions
+  - pipelineresources
+  - pipelineruns
+  - pipelines
+  - runs
+  - taskruns
+  - tasks
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - patch
+- apiGroups:
+  - triggers.tekton.dev
+  resources:
+  - clusterinterceptors
+  - clustertriggerbindings
+  - eventlisteners
+  - triggerbindings
+  - triggers
+  - triggertemplates
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - patch
+- apiGroups:
+  - pipelinesascode.tekton.dev
+  resources:
+  - repositories
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -565,6 +691,22 @@ kind: RoleBinding
 metadata:
   annotations:
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: pipeline-service-admin
+  namespace: openshift-pipelines
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-results-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: Pipeline Service
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
     argocd.argoproj.io/sync-wave: "0"
   name: chains-secret-admin
   namespace: tekton-chains
@@ -610,6 +752,22 @@ subjects:
 - kind: ServiceAccount
   name: tekton-chains-secrets-migrator
   namespace: openshift-pipelines
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: pipeline-service-admin
+  namespace: tekton-results
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-results-admin
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: Pipeline Service
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -694,6 +852,21 @@ subjects:
 - kind: ServiceAccount
   name: pipeline-service-exporter
   namespace: openshift-pipelines
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: pipeline-service-sre
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pipeline-service-sre
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: Pipeline Service
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -1136,7 +1309,7 @@ spec:
         app: pipeline-metrics-exporter
     spec:
       containers:
-      - image: quay.io/redhat-appstudio/pipeline-service-exporter:7c56cdd830d62b3dfe7b773a70344122deb82e34
+      - image: quay.io/redhat-appstudio/pipeline-service-exporter:151a24dc2c639602a89bd66858b63b7722bbe5a8
         name: pipeline-metrics-exporter
         ports:
         - containerPort: 9117
