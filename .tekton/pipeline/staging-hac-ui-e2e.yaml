@@ -113,6 +113,20 @@ spec:
         - input: $(tasks.hac-ui-e2e-test.status)
           operator: in
           values: ["Failed"]
+    - name: create-rollback-mr
+      taskRef:
+        name: create-rollback-mr
+      params:
+        - name: REVISION
+          value: $(params.revision)
+      workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      when:
+        - input: $(tasks.hac-ui-e2e-test.status)
+          operator: in
+          values: ["Failed"]
     - name: send-slack-notification
       taskRef:
         name: send-slack-notification
