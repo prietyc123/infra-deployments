@@ -1,0 +1,5 @@
+.tekton/pipeline/staging-hac-ui-e2e.yaml
+.tekton/staging-e2e-ci.yaml
+.tekton/tasks/create-rollback-mr.yaml
+.tekton/tasks/hac-ui-e2e-test.yaml
+components/pipeline-service/development/kustomization.yaml
