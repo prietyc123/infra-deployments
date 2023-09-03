@@ -1,0 +1,3 @@
+component.txt
+rollback_files.txt
+updated_files.txt
