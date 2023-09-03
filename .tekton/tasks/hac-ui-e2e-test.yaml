@@ -20,7 +20,7 @@ spec:
         set -e -u -o pipefail
 
         echo "hello test"
-        # exit 1
+        exit 1
 
     - name: enable-retries
       image: quay.io/hacdev/hac-tests:next
