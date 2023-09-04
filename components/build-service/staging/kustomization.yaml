@@ -3,3 +3,10 @@ kind: Kustomization
 resources:
 - ../base
 - ../base/external-secrets
+
+# patches:
+#  - path: scale-down-exporter.yaml
+#    target:
+#      kind: Deployment
+#      name: pipeline-metrics-exporter
+#      namespace: openshift-pipelines
