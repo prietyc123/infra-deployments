@@ -30,3 +30,4 @@ patches:
 #      kind: Deployment
 #      name: pipeline-metrics-exporter
 #      namespace: openshift-pipelines
+
