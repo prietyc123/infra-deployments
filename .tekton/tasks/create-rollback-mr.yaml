@@ -260,6 +260,7 @@ spec:
             github_app.create_reset_branch()
             github_app.revert_mr()
             github_app.upload_content()
+            time.sleep(30)
             infra_pr = github_app.create_mr()
             if "url" not in infra_pr:
                 infra_pr = github_app.get_pr()
