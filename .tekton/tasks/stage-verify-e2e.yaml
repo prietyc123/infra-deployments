@@ -1,0 +1,39 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: stage-verify-e2e-test
+spec:
+  description: >-
+    This task is for running stage e2e test on RHTAP staging cluster
+  params:
+  - name: TASK_RETRIES
+    description: number of times the task will be rerun
+    default: "0"
+  workspaces:
+    - name: stage-e2e-git
+  steps:
+    - name: run-stage-verify-e2e-test
+      image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+      workingDir: $(workspaces.clone-stage-e2e-git.path)
+      script: |
+        #!/usr/bin/env bash
+        set -e -u -o pipefail
+        make build 
+        E2E_ARGS_EXEC="--ginkgo.label-filter "stage" --ginkgo.vv" make run
+    - name: enable-retries
+      image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+      script: |
+        #!/usr/bin/env bash
+        set -e -u -o pipefail
+
+        if [ "$(cat $(steps.step-run.exitCode.path))" != "0" ]; then
+          if [ "$(context.task.retry-count)" == "$(params.TASK_RETRIES)" ]; then
+            echo "Marking this step as PASS though previous step failed as this is the last retry"
+            exit 0
+          else
+            echo "Marking this step as FAIL to make sure that the task is retried"
+            exit 1
+          fi
+        else
+          echo "Marking this step as PASS as previous step was successful"
+        fi

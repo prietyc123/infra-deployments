@@ -11,7 +11,7 @@ metadata:
     pipelinesascode.tekton.dev/pipeline: "[.tekton/pipeline/staging-hac-ui-e2e.yaml]"
     pipelinesascode.tekton.dev/task: "[.tekton/tasks/login-argocd.yaml]"
     pipelinesascode.tekton.dev/task-1: "[.tekton/tasks/sync-argocd-app.yaml]"
-    pipelinesascode.tekton.dev/task-2: "[.tekton/tasks/hac-ui-e2e-test.yaml]"
+    pipelinesascode.tekton.dev/task-2: "[.tekton/tasks/stage-verify-e2e.yaml]"
     pipelinesascode.tekton.dev/task-3: "[.tekton/tasks/check-app-health.yaml]"
     pipelinesascode.tekton.dev/task-4: "[.tekton/tasks/send-slack-notification.yaml]"
     pipelinesascode.tekton.dev/task-5: "[.tekton/tasks/get-pr-commit-message.yaml]"
