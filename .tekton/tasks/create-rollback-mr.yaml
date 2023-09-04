@@ -201,6 +201,7 @@ spec:
                       file = file.strip()
                       with open(f"$(workspaces.infra-deployment-git.path)/{file}", "rb") as fd:
                           encoded_string = base64.b64encode(fd.read()).decode("utf-8")
+                          print(f"hello file {file} and content {encoded_string}")
                       old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}').json().get("sha")
                       if old_sha is None:
                           self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
