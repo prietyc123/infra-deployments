@@ -3,8 +3,10 @@ kind: PipelineRun
 metadata:
   generateName: staging-hac-e2e-
   annotations:
-    pipelinesascode.tekton.dev/on-event: "[push]"
-    pipelinesascode.tekton.dev/on-target-branch: "[preview-POCPromotionToProd]"
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "push" && target_branch == "preview-POCPromotionToProd" && (("^(argo-cd-apps/app-of-app-sets/base|components/[^/]+/base)/.*$".pathChanged() && "^.*/(.*/)?staging/.*$"..pathChanged()) || "^.*/(.*/)?staging/.*$".pathChanged() || "^(argo-cd-apps/app-of-app-sets/base|components/[^/]+/base)/.*$"..pathChanged())
+    # pipelinesascode.tekton.dev/on-event: "[push]"
+    # pipelinesascode.tekton.dev/on-target-branch: "[preview-POCPromotionToProd]"
     pipelinesascode.tekton.dev/pipeline: "[.tekton/pipeline/staging-hac-ui-e2e.yaml]"
     pipelinesascode.tekton.dev/task: "[.tekton/tasks/login-argocd.yaml]"
     pipelinesascode.tekton.dev/task-1: "[.tekton/tasks/sync-argocd-app.yaml]"
