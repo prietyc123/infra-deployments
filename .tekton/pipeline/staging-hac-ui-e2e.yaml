@@ -28,7 +28,7 @@ spec:
         - name: deleteExisting
           value: "true"
         - name: revision
-          value: "POCPromotionToProd"
+          value: $(params.revision)
         - name: depth
           value: "3"
       workspaces:
@@ -51,12 +51,12 @@ spec:
     - name: staging-argocd-app-sync
       taskRef:
         name: app-sync
-      params:
-        - name: pull_request_files
-          value: $(tasks.get-pr-changed-files-path.results.merged-pr-files-changed)
       workspaces:
         - name: argocd-config
           workspace: shared-workspace
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
       runAfter:
         - get-pr-changed-files-path
         - staging-argocd-login
@@ -103,11 +103,23 @@ spec:
       params:
         - name: revision
           value: $(params.revision)
-        - name: app-name
-          value: $(tasks.staging-argocd-app-sync.results.app-name)
       workspaces:
         - name: argocd-config
           workspace: shared-workspace
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      when:
+        - input: $(tasks.hac-ui-e2e-test.status)
+          operator: in
+          values: ["Failed"]
+    - name: create-rollback-mr
+      taskRef:
+        name: create-rollback-mr
+      params:
+        - name: REVISION
+          value: $(params.revision)
+      workspaces:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git

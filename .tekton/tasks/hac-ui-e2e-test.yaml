@@ -50,6 +50,7 @@ spec:
         # npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
 
         # exit $TEST_RUN
+        exit 1
 
     - name: enable-retries
       image: quay.io/hacdev/hac-tests:next
@@ -68,5 +69,3 @@ spec:
         else
           echo "Marking this step as PASS as previous step was successful"
         fi
-
-

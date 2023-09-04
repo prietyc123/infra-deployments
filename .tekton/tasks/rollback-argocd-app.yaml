@@ -7,60 +7,49 @@ spec:
     This task is for rollback the failed application in the staging environment, except the operator rollback
   params:
     - name: revision
-    - name: app-name
-      type: string
-      description: application needs rollback in RHTAP staging environment
-      default: ""
   workspaces:
    - name: argocd-config
    - name: infra-deployment-git
   steps:
-    - name: operator-upgrade
-      image: quay.io/openshift-pipeline/ci
-      workingDir: $(workspaces.infra-deployment-git.path)
-      env:
-        - name: APP_NAME
-          value: $(params.app-name)
-      script: |
-        #!/usr/bin/env sh
-        set -u -o pipefail
-
-        filePath=$(find "$(pwd)/components/${APP_NAME}/staging" -name staging-build.yaml | head -n 1)
-
-        echo "check whether the application has operator upgrade"
-        if [ $(git diff $(params.revision)^ $(params.revision) -- $filePath | grep -qE '^-.*channel:|^\+.*channel:') ]; then
-          echo "Rollback is not possible for operator upgrade"
-          exit 1
-        fi
-        exit 0
     - name: argocd-app-rollback
       image: quay.io/devtools_gitops/test_image:4.0.5
-      workingDir: $(workspaces.argocd-config-git.path)
-      env:
-        - name: APP_NAME
-          value: $(params.app-name)
+      workingDir: $(workspaces.infra-deployment-git.path)
       script: |
         #!/usr/bin/env sh
         set -u -o pipefail
 
-        ROLLBACK_TIMEOUT=300
+        # Read each line from the component file and remove leading/trailing whitespace
+        while IFS= read -r line
+        do
+          component="$line"
+          component=$(echo -e "$component" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          
+          # Set the delimiter to separate componentapp and app name
+          IFS=":"
+          read -ra app <<< "$component"
 
-        if [ "$(cat $(steps.step-run.exitCode.path))" == "0" ]; then
-          echo "rollback the application: ${APP_NAME}"
-          chmod 0400 "$(pwd)/argocdconfig"
-          rollback_output=$(timeout $ROLLBACK_TIMEOUT argocd app rollback $app_name --config "$(pwd)/argocdconfig" 2>&1)
-          if [[ $rollback_output == *"Failed to rollback application"*"Application has no history"* ]]; then
-            echo "Rollback failed: Application has no history."
-            exit 1
-          elif [[ $rollback_output == *"Operation cannot be completed"* ]]; then
-            echo "Rollback failed for an unknown reason."
+          filePath=$(find "$(pwd)/components/${app[0]}/development" -name dev-build.yaml | head -n 1)
+          
+          echo "check whether the application has operator upgrade"
+          git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
+          if [ $(git diff $(params.revision)^ $(params.revision) -- $filePath | grep -qE '^-.*channel:|^\+.*channel:') ]; then
+            echo "Rollback is not possible for operator upgrade"
             exit 1
           else
-            echo "$rollback_output"
-            echo "Rollback successful."
-            exit 0
+            ROLLBACK_TIMEOUT=300
+            echo "rollback the application: ${app[1]}"
+            chmod 0400 "$(workspaces.argocd-config.path)/argocdconfig"
+            rollback_output=$(timeout $ROLLBACK_TIMEOUT argocd app rollback ${app[1]} --config "$(workspaces.argocd-config.path)/argocdconfig" --grpc-web 2>&1)
+            if [[ $rollback_output == *"Failed to rollback application"*"Application has no history"* ]]; then
+              echo "Rollback failed: Application has no history."
+              exit 1
+            elif [[ $rollback_output == *"Operation cannot be completed"* ]]; then
+              echo "Rollback failed for an unknown reason."
+              exit 1
+            else
+              echo "$rollback_output"
+              echo "Rollback successful."
+              exit 0
+            fi
           fi
-        else
-          echo "Marking this step as FAIL as previous step was failed."
-          exit 1
-        fi
+        done < "component.txt"
