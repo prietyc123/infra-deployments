@@ -4,5 +4,6 @@ pipeline-service:
   # - pipeline-service-stone-stg-m01
   # - pipeline-service-stone-stg-rh01
 build-service:
-  - build-service-stone-stg-m01
-  - build-service-stone-stg-rh01
+  - build-service-in-cluster-local
+  # - build-service-stone-stg-m01
+  # - build-service-stone-stg-rh01
