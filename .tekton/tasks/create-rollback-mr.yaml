@@ -152,6 +152,38 @@ spec:
                     print(f"Error: {stderr.decode('utf-8')}")
                 else:
                     print("Output written to rollback_files.txt")
+            
+            def list_pulls_associated_with_sha(self):
+                merged_sha = os.environ.get('REVISION')
+                target_gh_repo = os.environ.get('TARGET_GH_REPO')
+                req = self._request(
+                    "GET",
+                    f"/repos/{target_gh_repo}/commits/{merged_sha}/pulls",
+                    headers={
+                        "Accept": "application/vnd.github.v3+json"
+                    })
+                json_output = req.json()["items"][0]["number"]
+                print(json_output)
+                return json_output
+
+            def create_revert_pr(self, revert_pull_number, description):
+                target_gh_repo = os.environ.get('TARGET_GH_REPO')
+                req = self._request(
+                    "POST",
+                    f"/repos/{target_gh_repo}/pulls/{revert_pull_number}/revert",
+                    headers={
+                        "Authorization": f"Bearer {self.token}",
+                        "Accept": "application/vnd.github.v3+json"
+                    },
+                    data={
+                        "head": repo_name,
+                        "base": "preview-POCPromotionToProd",
+                        "title": f"Rollback commit {commit}",
+                        "body": f"Revert pr {revert_pull_number} with {description}"
+                        "maintainer_can_modify": False
+                    })
+                json_output = req.json()
+                print(json_output)
 
             def create_mr(self):
                 repo_name = "rollback-" + os.environ.get('REVISION')[:12]
@@ -259,16 +291,19 @@ spec:
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
 
             github_app.create_reset_branch()
-            github_app.revert_mr()
-            github_app.upload_content()
+            revert_pull_number = github_app.list_pulls_associated_with_sha()
+            description = f"Rollback PR for commit: {commit}"
+            github_app.create_revert_pr(revert_pull_number, description)
+            # github_app.revert_mr()
+            # github_app.upload_content()
             # time.sleep(30)
-            infra_pr = github_app.create_mr()
-            if "url" not in infra_pr:
-                infra_pr = github_app.get_pr()
-            description = infra_pr["body"]
-            if description == None:
-                description = f"Rollback PR for commit: {commit}"
-            github_app.update_mr_description(infra_pr["url"], description)
+            # infra_pr = github_app.create_mr()
+            # if "url" not in infra_pr:
+            #     infra_pr = github_app.get_pr()
+            # description = infra_pr["body"]
+            # if description == None:
+            #     description = f"Rollback PR for commit: {commit}"
+            # github_app.update_mr_description(infra_pr["url"], description)
 
         if __name__ == '__main__':
             main()
