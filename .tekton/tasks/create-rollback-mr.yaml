@@ -166,24 +166,33 @@ spec:
                 print(json_output)
                 return json_output
 
-            def create_revert_pr(self, revert_pull_number, description):
+            def create_revert_pr(self, query, var):
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
-                req = self._request(
-                    "POST",
-                    f"/repos/{target_gh_repo}/pulls/{revert_pull_number}/revert",
-                    headers={
-                        "Authorization": f"Bearer {self.token}",
-                        "Accept": "application/vnd.github.v3+json"
-                    },
-                    data={
-                        "head": repo_name,
-                        "base": "preview-POCPromotionToProd",
-                        "title": f"Rollback commit {commit}",
-                        "body": f"Revert pr {revert_pull_number} with {description}"
-                        "maintainer_can_modify": False
-                    })
-                json_output = req.json()
-                print(json_output)
+
+                headers = {
+                    'Authorization': f'token {self.token}'
+                }
+
+                url = f'https://api.github.com/graphql'
+
+                response = requests.post(url, json={'query': query, 'variables': var}, headers=headers)
+
+                # req = self._request(
+                #     "POST",
+                #     f"/repos/{target_gh_repo}/pulls/{revert_pull_number}/revert",
+                #     headers={
+                #         "Authorization": f"Bearer {self.token}",
+                #         "Accept": "application/vnd.github.v3+json"
+                #     },
+                #     data={
+                #         "head": repo_name,
+                #         "base": "preview-POCPromotionToProd",
+                #         "title": f"Rollback commit {commit}",
+                #         "body": f"Revert pr {revert_pull_number} with {description}"
+                #         "maintainer_can_modify": False
+                #     })
+                # json_output = req.json()
+                print(response.json())
 
             def create_mr(self):
                 repo_name = "rollback-" + os.environ.get('REVISION')[:12]
@@ -290,10 +299,27 @@ spec:
                 app_id=app_id,
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
 
-            github_app.create_reset_branch()
+            # github_app.create_reset_branch()
+
             revert_pull_number = github_app.list_pulls_associated_with_sha()
-            description = f"Rollback PR for commit: {commit}"
-            github_app.create_revert_pr(revert_pull_number, description)
+            query = """
+            mutation ($input: RevertPullRequestInput!) {
+            revertPullRequest(input: $input) {
+                pullRequest {
+                number
+                }
+            }
+            }
+            """
+            # Define the variables for the mutation
+            variables = {
+                "input": {
+                    "pullRequestId": revert_pull_number
+                }
+            }
+            
+            # description = f"Rollback PR for commit: {commit}"
+            github_app.create_revert_pr(query, variables)
             # github_app.revert_mr()
             # github_app.upload_content()
             # time.sleep(30)
