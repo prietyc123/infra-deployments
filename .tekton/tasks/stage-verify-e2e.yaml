@@ -1,0 +1,79 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: stage-verify-e2e-test
+spec:
+  description: >-
+    This task is for running stage e2e test on RHTAP staging cluster
+  params:
+  - name: TASK_RETRIES
+    description: number of times the task will be rerun
+    default: "0"
+  workspaces:
+    - name: clone-stage-e2e-git
+  steps:
+    - name: run-stage-verify-e2e-test
+      image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+      workingDir: $(workspaces.clone-stage-e2e-git.path)
+      script: |
+        #!/usr/bin/env bash
+        set -e -u -o pipefail
+        make build 
+        E2E_ARGS_EXEC="--ginkgo.label-filter "stage" --ginkgo.vv" make run
+    # - name: run-hac-ui-e2e-test
+    #   image: quay.io/hacdev/hac-tests:next
+    #   workingDir: $(workspaces.hac-ui-e2e-git.path)
+    #   script: |
+    #     #!/usr/bin/env bash
+    #     set -e -u -o pipefail
+
+    #     echo "hello test"
+
+    #     # export CYPRESS_HAC_BASE_URL="https://console.dev.redhat.com/preview/application-pipeline"
+    #     # export CYPRESS_USERNAME=user1
+    #     # export CYPRESS_PASSWORD=user1
+
+    #     # cd /tmp/e2e
+    #     # oc apply -f - <<EOF
+    #     # apiVersion: toolchain.dev.openshift.com/v1alpha1
+    #     # kind: UserSignup
+    #     # metadata:
+    #     #   name: user1
+    #     #   namespace: toolchain-host-operator
+    #     #   labels:
+    #     #     toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
+    #     #   annotations:
+    #     #     toolchain.dev.openshift.com/user-email: user1@user.us
+    #     # spec:
+    #     #   username: user1
+    #     #   userid: user1
+    #     #   approved: true
+    #     # EOF
+
+    #     # sleep 5
+    #     # oc get UserSignup -n toolchain-host-operator
+        
+    #     # echo "Run tests"
+    #     # TEST_RUN=0
+    #     # npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
+
+    #     # exit $TEST_RUN
+    #     exit 1
+
+    - name: enable-retries
+      image: quay.io/hacdev/hac-tests:next
+      script: |
+        #!/usr/bin/env bash
+        set -e -u -o pipefail
+
+        if [ "$(cat $(steps.step-run.exitCode.path))" != "0" ]; then
+          if [ "$(context.task.retry-count)" == "$(params.TASK_RETRIES)" ]; then
+            echo "Marking this step as PASS though previous step failed as this is the last retry"
+            exit 0
+          else
+            echo "Marking this step as FAIL to make sure that the task is retried"
+            exit 1
+          fi
+        else
+          echo "Marking this step as PASS as previous step was successful"
+        fi

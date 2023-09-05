@@ -68,34 +68,34 @@ spec:
           workspace: shared-workspace
       runAfter:
         - staging-argocd-app-sync
-    - name: clone-hac-ui-e2e-git
+    - name: clone-stage-e2e-git
       taskRef:
         name: git-clone
       params:
         - name: url
-          value: 'https://github.com/openshift/hac-dev.git'
+          value: 'https://github.com/sawood14012/e2e-tests.git'
         - name: deleteExisting
           value: "true"
         - name: revision
-          value: "main"
+          value: "verify-stage"
       workspaces:
       - name: output
         workspace: git
-        subPath: hac-ui-e2e-git
+        subPath: stage-e2e-git
       timeout: 10m
-    - name: hac-ui-e2e-test
+    - name: stage-verify-e2e-test
       taskRef:
-        name: hac-ui-e2e-test
+        name: stage-verify-e2e-test
       params:
       - name: TASK_RETRIES
         value: "$(context.pipelineTask.retries)"
       workspaces:
-      - name: hac-ui-e2e-git
+      - name: stage-e2e-git
         workspace: git
-        subPath: hac-ui-e2e-git
+        subPath: stage-e2e-git
       runAfter:
         - argocd-app-synced-healthy
-        - clone-hac-ui-e2e-git
+        - clone-stage-e2e-git
   finally:
     - name: rollback-argocd-app
       taskRef:
@@ -110,7 +110,7 @@ spec:
           workspace: git
           subPath: infra-deployment-git
       when:
-        - input: $(tasks.hac-ui-e2e-test.status)
+        - input: $(tasks.stage-verify-e2e-test.status)
           operator: in
           values: ["Failed"]
     - name: create-rollback-mr
@@ -124,7 +124,7 @@ spec:
           workspace: git
           subPath: infra-deployment-git
       when:
-        - input: $(tasks.hac-ui-e2e-test.status)
+        - input: $(tasks.stage-verify-e2e-test.status)
           operator: in
           values: ["Failed"]
     - name: send-slack-notification

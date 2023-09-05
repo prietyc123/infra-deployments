@@ -178,7 +178,8 @@ spec:
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 target_branch = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/{branch}").json()
-                main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/main").json()['object']['sha']
+                # main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/main").json()['object']['sha']
+                main_branch_sha = os.environ.get('REVISION')
                 if "ref" in target_branch:
                     # update branch
                     self._request(
@@ -260,7 +261,7 @@ spec:
             github_app.create_reset_branch()
             github_app.revert_mr()
             github_app.upload_content()
-            time.sleep(30)
+            # time.sleep(30)
             infra_pr = github_app.create_mr()
             if "url" not in infra_pr:
                 infra_pr = github_app.get_pr()
