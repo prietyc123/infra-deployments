@@ -10,16 +10,60 @@ spec:
     description: number of times the task will be rerun
     default: "0"
   workspaces:
-    - name: clone-stage-e2e-git
+    - name: stage-e2e-git
   steps:
     - name: run-stage-verify-e2e-test
-      image: registry.access.redhat.com/ubi8/ubi-minimal:latest
-      workingDir: $(workspaces.clone-stage-e2e-git.path)
+      image: registry.access.redhat.com/ubi8/go-toolset:1.19.10-10.1692783630
+      workingDir: $(workspaces.stage-e2e-git.path)
       script: |
         #!/usr/bin/env bash
         set -e -u -o pipefail
+        mkdir -p ~/.kube
+        cat <<EOF > ~/.kube/config
+        apiVersion: v1
+        clusters:
+        - cluster:
+            server: YOUR_KUBE_API_SERVER_URL
+          name: YOUR_CLUSTER_NAME
+        contexts:
+        - context:
+            cluster: YOUR_CLUSTER_NAME
+            user: YOUR_USER_NAME
+          name: YOUR_CONTEXT_NAME
+        current-context: YOUR_CONTEXT_NAME
+        kind: Config
+        preferences: {}
+        users:
+        - name: YOUR_USER_NAME
+          user:
+            token: YOUR_KUBE_API_TOKEN
+        EOF
         make build 
         E2E_ARGS_EXEC="--ginkgo.label-filter "stage" --ginkgo.vv" make run
+      env:
+        - name: STAGE_SSOURL
+          valueFrom:
+            secretKeyRef:
+              name: stage-test-e2e
+              key: ssourl
+      env:
+        - name: STAGE_APIURL
+          valueFrom:
+            secretKeyRef:
+              name: stage-test-e2e
+              key: apiurl
+      env:
+        - name: STAGEUSER_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: stage-test-e2e
+              key: token
+      env:
+        - name: STAGE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: stage-test-e2e
+              key: username
     # - name: run-hac-ui-e2e-test
     #   image: quay.io/hacdev/hac-tests:next
     #   workingDir: $(workspaces.hac-ui-e2e-git.path)
@@ -61,7 +105,7 @@ spec:
     #     exit 1
 
     - name: enable-retries
-      image: quay.io/hacdev/hac-tests:next
+      image: registry.access.redhat.com/ubi8/go-toolset:1.19.10-10.1692783630
       script: |
         #!/usr/bin/env bash
         set -e -u -o pipefail
