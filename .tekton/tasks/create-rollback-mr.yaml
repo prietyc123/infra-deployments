@@ -234,7 +234,7 @@ spec:
                 #         f"/repos/{target_gh_repo}/git/refs",
                 #         data={"sha": main_branch_sha, "ref": f"refs/heads/{branch}"}
                 #     )
-            def upload_content(self):
+            def upload_content(self, base_branch):
               branch = "rollback-" + os.environ.get('REVISION')[:12]
               target_gh_repo = os.environ.get('TARGET_GH_REPO')
               with open('../rollback_files.txt', 'r') as file_list:
@@ -243,7 +243,7 @@ spec:
                       with open(f"$(workspaces.infra-deployment-git.path)/{file}", "rb") as fd:
                           encoded_string = base64.b64encode(fd.read()).decode("utf-8")
                           print(f"hello file {file} and content {encoded_string}")
-                      old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}').json().get("sha")
+                      old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}?ref="{base_branch}').json().get("sha")
                       if old_sha is None:
                           self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
                       else:
@@ -304,7 +304,7 @@ spec:
             pull_commit_id = pr_data["head"]["sha"]
             github_app.create_reset_branch(base_branch)
             github_app.revert_mr(pull_commit_id)
-            github_app.upload_content()
+            github_app.upload_content(base_branch)
             github_app.create_mr(base_branch, revert_pull_number)
             # time.sleep(30)
             # infra_pr = github_app.create_mr()
