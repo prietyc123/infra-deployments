@@ -10,11 +10,12 @@ spec:
     - name: pr_id
     - name: MESSAGE
       description: |
-        Markdown template for message that will be sent in the case of staging e2e failure.
+        Markdown template for message that will be sent in the case of after staging e2e pipeline completion.
         You can use any formatting that Slack supports. Additionally it's possible to use
         following placeholders
         * <icon> pipeline run status icon, different for successful and failed pipeline run
         * <logs_url> URL pointing to pipeline run logs in OpenShift web console
+        * <pr_url> URL pointing to pull request for which the pipeline passed or failed
     - name: SECRET_NAME
       type: string
       description: The secret name where you have stored the webhook URL, it expects the key of the secret to be `slack_webhook_url`
