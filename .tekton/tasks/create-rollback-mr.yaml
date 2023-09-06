@@ -243,13 +243,13 @@ spec:
                     with open(f"$(workspaces.infra-deployment-git.path)/{file}", "rb") as fd:
                         encoded_string = base64.b64encode(fd.read()).decode("utf-8")
                         print(f"hello file {file} and content {encoded_string}")
-                    old_sha = self._request("GET", f'/repos/{TARGET_GH_REPO}/contents/{file}?ref="preview-POCPromotionToProd"').json().get("sha")
+                    old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}?ref="preview-POCPromotionToProd"').json().get("sha")
                     if old_sha is None:
                         print("hello file create")
-                        self._request("PUT", f'/repos/{TARGET_GH_REPO}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
+                        self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
                     else:
                         print("hello file update")
-                        self._request("PUT", f'/repos/{TARGET_GH_REPO}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string, "sha": old_sha})
+                        self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string, "sha": old_sha})
 
             #   with open('../rollback_files.txt', 'r') as file_list:
             #       for file in file_list:
