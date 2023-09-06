@@ -194,7 +194,8 @@ spec:
                         "head": repo_name,
                         "base": f"{base_branch}",
                         "title": f"Rollback commit {commit}",
-                        "body": f"This PR reverts changes from PR #{pr_id}."
+                        "body": f"This PR reverts changes from PR #{pr_id}.",
+                        "maintainer_can_modify": False
                     })
                 json_data = req.json()
                 print(json_data)
