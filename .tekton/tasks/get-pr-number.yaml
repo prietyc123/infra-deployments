@@ -132,8 +132,10 @@ spec:
                     "GET",
                     f"/repos/{target_gh_repo}/commits/{merged_sha}/pulls",
                     headers={
+                        "Authorization": f"Bearer {self.token}",
                         "Accept": "application/vnd.github.v3+json"
                     })
+                print(req.json())
                 pr_id = req.json()[0]["number"]
                 return pr_id
 
@@ -154,7 +156,7 @@ spec:
 
             revert_pull_number = github_app.list_pulls_associated_with_sha()
             with open("$(results.pr_id.path)", "a") as f:
-              f.write(revert_pull_number)
+              f.write(str(revert_pull_number))
 
         if __name__ == '__main__':
             main()
