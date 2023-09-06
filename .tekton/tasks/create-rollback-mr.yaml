@@ -210,7 +210,7 @@ spec:
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 target_branch = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/{branch}").json()
-                main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/preview-POCPromotionToProd").json()['object']['sha']
+                main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/main").json()['object']['sha']
                 # # create branch
                 # self._request(
                 #     "POST",
