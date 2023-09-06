@@ -134,12 +134,12 @@ spec:
                                         data=json.dumps(data))
             
             def revert_mr(self, pull_commit_id):
-                # commit = os.environ.get('REVISION')
-                cmd = ['git', 'revert', '-m', '1', f"{pull_commit_id}", "--no-edit"]
+                commit = os.environ.get('REVISION')
+                cmd = ['git', 'revert', '-m', '1', f"{commit}", "--no-edit"]
                 cmd_string = " ".join(cmd)
                 output = subprocess.Popen(cmd_string.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = output.communicate()
-                cmd = ['git', 'diff', '--name-only', f"{pull_commit_id}..HEAD"]
+                cmd = ['git', 'diff', '--name-only', f"{commit}..HEAD"]
                 cmd_string = " ".join(cmd)
                 output = subprocess.Popen(cmd_string.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = output.communicate()
