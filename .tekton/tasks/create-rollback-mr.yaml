@@ -162,7 +162,7 @@ spec:
                     headers={
                         "Accept": "application/vnd.github.v3+json"
                     })
-                pr_id = req.json()["items"][0]["number"]
+                pr_id = req.json()[0]["number"]
                 print(pr_id)
                 return pr_id
             
