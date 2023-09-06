@@ -139,7 +139,7 @@ spec:
                 cmd_string = " ".join(cmd)
                 output = subprocess.Popen(cmd_string.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = output.communicate()
-                cmd = ['git', 'diff', '--name-only', f"{commit}..HEAD"]
+                cmd = ['git', 'diff', '--name-only', f"{commit}^", f"{commit}"]
                 cmd_string = " ".join(cmd)
                 output = subprocess.Popen(cmd_string.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = output.communicate()
@@ -179,7 +179,7 @@ spec:
                 print(pull_request_data)
                 return pull_request_data
 
-            def create_mr(self, base_branch, pr_id):
+            def create_mr(self):
                 repo_name = "rollback-" + os.environ.get('REVISION')[:12]
                 commit = os.environ.get('REVISION')[:12]
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
@@ -192,13 +192,13 @@ spec:
                     },
                     data={
                         "head": repo_name,
-                        "base": f"{base_branch}",
+                        "base": "preview-POCPromotionToProd",
                         "title": f"Rollback commit {commit}",
-                        "body": f"This PR reverts changes from PR #{pr_id}.",
                         "maintainer_can_modify": False
                     })
                 json_data = req.json()
                 print(json_data)
+                return json_data
                 # if req.status_code == 201:
                 #     pr_data = req.json()
                 #     pr_number = pr_data["number"]
@@ -206,11 +206,11 @@ spec:
                 # else:
                 #     print(f"Failed to create a new pull request. Status code: {req.status_code}")
 
-            def create_reset_branch(self, base_branch):
+            def create_reset_branch(self):
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 target_branch = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/{branch}").json()
-                main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/{base_branch}").json()['object']['sha']
+                main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/preview-POCPromotionToProd").json()['object']['sha']
                 # # create branch
                 # self._request(
                 #     "POST",
@@ -222,31 +222,46 @@ spec:
                 #     data={"sha": main_branch_sha, "ref": f"refs/heads/{branch}"}
                 # )
                 if "ref" in target_branch:
+                    # update branch
                     self._request(
                         "PATCH",
                         f"/repos/{target_gh_repo}/git/refs/heads/{branch}",
                         data={"sha": main_branch_sha, "force": True}
                     )
                 else:
+                    # create branch
                     self._request(
                         "POST",
                         f"/repos/{target_gh_repo}/git/refs",
                         data={"sha": main_branch_sha, "ref": f"refs/heads/{branch}"}
                     )
-            def upload_content(self, base_branch):
+            def upload_content(self):
               branch = "rollback-" + os.environ.get('REVISION')[:12]
               target_gh_repo = os.environ.get('TARGET_GH_REPO')
-              with open('../rollback_files.txt', 'r') as file_list:
-                  for file in file_list:
-                      file = file.strip()
-                      with open(f"$(workspaces.infra-deployment-git.path)/{file}", "rb") as fd:
-                          encoded_string = base64.b64encode(fd.read()).decode("utf-8")
-                          print(f"hello file {file} and content {encoded_string}")
-                      old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}?ref="{branch}').json().get("sha")
-                      if old_sha is None:
-                          self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
-                      else:
-                          self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string, "sha": old_sha})
+              for file in open('../rollback_files.txt').readlines():
+                    file = file.strip()
+                    with open(f"$(workspaces.infra-deployment-git.path)/{file}", "rb") as fd:
+                        encoded_string = base64.b64encode(fd.read()).decode("utf-8")
+                        print(f"hello file {file} and content {encoded_string}")
+                    old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}?ref="preview-POCPromotionToProd"').json().get("sha")
+                    if old_sha is None:
+                        print("hello file create")
+                        self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
+                    else:
+                        print("hello file update")
+                        self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string, "sha": old_sha})
+
+            #   with open('../rollback_files.txt', 'r') as file_list:
+            #       for file in file_list:
+            #           file = file.strip()
+            #           with open(f"$(workspaces.infra-deployment-git.path)/{file}", "rb") as fd:
+            #               encoded_string = base64.b64encode(fd.read()).decode("utf-8")
+            #               print(f"hello file {file} and content {encoded_string}")
+            #           old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}?ref="{branch}').json().get("sha")
+            #           if old_sha is None:
+            #               self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
+            #           else:
+            #               self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string, "sha": old_sha})
 
             def get_pr(self):
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
@@ -299,20 +314,20 @@ spec:
 
             revert_pull_number = github_app.list_pulls_associated_with_sha()
             pr_data = github_app.get_pr_details(revert_pull_number)
-            base_branch = pr_data["base"]["ref"]
+            #base_branch = pr_data["base"]["ref"]
             pull_commit_id = pr_data["head"]["sha"]
-            github_app.create_reset_branch(base_branch)
+            github_app.create_reset_branch()
             github_app.revert_mr(pull_commit_id)
-            github_app.upload_content(base_branch)
-            github_app.create_mr(base_branch, revert_pull_number)
+            github_app.upload_content()
+            infra_pr = github_app.create_mr()
             # time.sleep(30)
-            # infra_pr = github_app.create_mr()
-            # if "url" not in infra_pr:
-            #     infra_pr = github_app.get_pr()
-            # description = infra_pr["body"]
-            # if description == None:
-            #     description = f"Rollback PR for commit: {commit}"
-            # github_app.update_mr_description(infra_pr["url"], description)
+            infra_pr = github_app.create_mr()
+            if "url" not in infra_pr:
+                infra_pr = github_app.get_pr()
+            description = infra_pr["body"]
+            if description == None:
+                description = f"Rollback PR for pull request id: {revert_pull_number}"
+            github_app.update_mr_description(infra_pr["url"], description)
 
         if __name__ == '__main__':
             main()
