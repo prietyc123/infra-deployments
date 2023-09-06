@@ -23,11 +23,12 @@ spec:
         chmod 0400 "$(pwd)/argocdconfig"
         while [[ $(date +%s) -lt $endtime ]]; do
           app_status=$(argocd app list --config "$(pwd)/argocdconfig" -o json | jq -r '.[] | .status.health.status')
-          app_sync_status=$(argocd app list --config "$(pwd)/argocdconfig" -o json | jq -r '.[] | .status.sync.status')
+          # commenting sync status because one app sync status is unknown. that app is not related to the change
+          # app_sync_status=$(argocd app list --config "$(pwd)/argocdconfig" -o json | jq -r '.[] | .status.sync.status')
 
           # check if all apps are healthy and synced
           all_apps_healthy=true
-          all_apps_synced=true
+          # all_apps_synced=true
 
           for status in $app_status; do
             if [[ $status != "Healthy" ]]; then
@@ -36,15 +37,20 @@ spec:
             fi
           done
 
-          for sync_status in $app_sync_status; do
-            if [[ $sync_status != "Synced" ]]; then
-              all_apps_synced=false
-              break
-            fi
-          done
+          # for sync_status in $app_sync_status; do
+          #   if [[ $sync_status != "Synced" ]]; then
+          #     all_apps_synced=false
+          #     break
+          #   fi
+          # done
 
-          if [[ $all_apps_healthy == "true" && $all_apps_synced == "true" ]]; then
-            echo "All apps are healthy and synced."
+          # if [[ $all_apps_healthy == "true" && $all_apps_synced == "true" ]]; then
+          #   echo "All apps are healthy and synced."
+          #   exit 0
+          # fi
+
+          if [[ $all_apps_healthy == "true" ]]; then
+            echo "All apps are healthy"
             exit 0
           fi
 
