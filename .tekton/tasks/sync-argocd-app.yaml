@@ -5,14 +5,6 @@ metadata:
 spec:
   description: >-
     This task is for syncing the staging cluster argocd application
-  # params:
-  #   - name: pull_request_files
-  #     type: array
-  #     description: Files changed in the pull request which has been merged to be deployed on RHTAP staging environment
-  #     default: ""
-  results:
-    - name: app-name
-      description: Name of the app to be synced
   workspaces:
    - name: argocd-config
    - name: infra-deployment-git

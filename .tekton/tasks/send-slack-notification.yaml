@@ -7,6 +7,7 @@ spec:
     These tasks post a Downstream CI run status message to a Slack channel.
     This task uses Incoming Webhooks of Slack to send the message.
   params:
+    - name: pr_id
     - name: MESSAGE
       description: |
         Markdown template for message that will be sent in the case of staging e2e failure.
@@ -18,6 +19,9 @@ spec:
       type: string
       description: The secret name where you have stored the webhook URL, it expects the key of the secret to be `slack_webhook_url`
       default: rhtap-webhook
+    - name: TARGET_GH_REPO
+      description: GitHub repository of the infra-deployments code
+      default: prietyc123/infra-deployments
   steps:
     - name: post-slack-message
       image: quay.io/openshift-pipeline/ci
@@ -42,9 +46,11 @@ spec:
         fi
 
         tag_ic="@ic-appstudio-qe"
+        prUrl="https://github.com/$(params.TARGET_GH_REPO)/pull/$(params.pr_id)"
 
         echo "Setting logs URL, pipeline run name and tagging IC in message"
         MSG="${MSG//<logs_url>/$logsUrl}"
+        MSG="${MSG//<pr_url>/$prUrl}"
         MSG="${MSG//<pr_name>/$pipelineRunName}"
         MSG="${MSG//<tag_ic>/$tag_ic}"
 

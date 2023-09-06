@@ -36,6 +36,18 @@ spec:
         workspace: git
         subPath: infra-deployment-git
       timeout: 10m
+    - name: get-pr-number
+      taskRef:
+        name: get-pr-number
+      params:
+        - name: REVISION
+          value: $(params.revision)
+      workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      runAfter:
+        - clone-infra-deployment-git
     - name: get-pr-changed-files-path
       taskRef:
         name: get-pr-changed-files
@@ -117,6 +129,8 @@ spec:
       taskRef:
         name: create-rollback-mr
       params:
+        - name: pr_id
+          value: $(tasks.get-pr-number.results.pr_id)
         - name: REVISION
           value: $(params.revision)
       workspaces:
@@ -131,9 +145,11 @@ spec:
       taskRef:
         name: send-slack-notification
       params:
+        - name: pr_id
+          value: $(tasks.get-pr-number.results.pr_id)
         - name: MESSAGE
           value: |
-            <icon> Staging e2e pipeline run <pr_name> *<run_status>* <icon> <<logs_url>|logs> <tag_ic>
+            <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|logs> <tag_ic>
       when:
         - input: $(params.SEND_SLACK_NOTIFICATION)
           operator: in

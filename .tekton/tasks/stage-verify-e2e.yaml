@@ -38,7 +38,6 @@ spec:
           user:
             token: YOUR_KUBE_API_TOKEN
         EOF
-        exit 1
         make build 
         E2E_ARGS_EXEC="--ginkgo.label-filter "stage" --ginkgo.vv" make run
       env:

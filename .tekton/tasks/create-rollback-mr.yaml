@@ -6,6 +6,7 @@ spec:
   description: |
     reset the pull request, generates pull-request for redhat-appstudio/infra-deployments repository.
   params:
+    - name: pr_id
     - name: REVISION
       description: Git reference which was built by the Pipeline
     - name: TARGET_GH_REPO
@@ -31,16 +32,6 @@ spec:
         # 'private-key' - private key for Github app
         secretName: $(params.shared-secret)
   steps:
-    # - name: reset-changes
-    #   image: quay.io/openshift-pipeline/ci
-    #   workingDir: $(workspaces.infra-deployment-git.path)
-    #   script: |
-    #     # git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
-    #     # git checkout preview-POCPromotionToProd
-    #     git config --global --add safe.directory /workspace/infra-deployment-git
-    #     git reset --hard $(params.REVISION)
-
-    #     git status -s --porcelain | cut -c4- > rollback_files.txt
     - name: create-mr
       image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
       workingDir: $(workspaces.infra-deployment-git.path)
@@ -56,6 +47,8 @@ spec:
           value: "$(params.GITHUB_APP_INSTALLATION_ID)"
         - name: GITHUB_API_URL
           value: https://api.github.com
+        - name: PR_ID
+          value: "$(params.pr_id)"
         - name: REVISION
           value: $(params.REVISION)
         - name: TARGET_GH_REPO
@@ -153,19 +146,6 @@ spec:
                 else:
                     print("Output written to rollback_files.txt")
             
-            def list_pulls_associated_with_sha(self):
-                merged_sha = os.environ.get('REVISION')
-                target_gh_repo = os.environ.get('TARGET_GH_REPO')
-                req = self._request(
-                    "GET",
-                    f"/repos/{target_gh_repo}/commits/{merged_sha}/pulls",
-                    headers={
-                        "Accept": "application/vnd.github.v3+json"
-                    })
-                pr_id = req.json()[0]["number"]
-                print(pr_id)
-                return pr_id
-            
             def get_pr_details(self, pr_id):
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 req = self._request(
@@ -199,28 +179,12 @@ spec:
                 json_data = req.json()
                 print(json_data)
                 return json_data
-                # if req.status_code == 201:
-                #     pr_data = req.json()
-                #     pr_number = pr_data["number"]
-                #     print(f"Reverted changes from PR #{pr_id} in a new pull request #{pr_number}.")
-                # else:
-                #     print(f"Failed to create a new pull request. Status code: {req.status_code}")
 
             def create_reset_branch(self):
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 target_branch = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/{branch}").json()
                 main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/main").json()['object']['sha']
-                # # create branch
-                # self._request(
-                #     "POST",
-                #     f"/repos/{target_gh_repo}/git/refs",
-                #     headers={
-                #         "Authorization": f"Bearer {self.token}",
-                #         "Accept": "application/vnd.github.v3+json"
-                #     },
-                #     data={"sha": main_branch_sha, "ref": f"refs/heads/{branch}"}
-                # )
                 if "ref" in target_branch:
                     # update branch
                     self._request(
@@ -250,18 +214,6 @@ spec:
                     else:
                         print("hello file update")
                         self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string, "sha": old_sha})
-
-            #   with open('../rollback_files.txt', 'r') as file_list:
-            #       for file in file_list:
-            #           file = file.strip()
-            #           with open(f"$(workspaces.infra-deployment-git.path)/{file}", "rb") as fd:
-            #               encoded_string = base64.b64encode(fd.read()).decode("utf-8")
-            #               print(f"hello file {file} and content {encoded_string}")
-            #           old_sha = self._request("GET", f'/repos/{target_gh_repo}/contents/{file}?ref="{branch}').json().get("sha")
-            #           if old_sha is None:
-            #               self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string})
-            #           else:
-            #               self._request("PUT", f'/repos/{target_gh_repo}/contents/{file}', data={"message": f"update {file}", "branch": branch, "content": encoded_string, "sha": old_sha})
 
             def get_pr(self):
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
@@ -312,7 +264,7 @@ spec:
                 app_id=app_id,
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
 
-            revert_pull_number = github_app.list_pulls_associated_with_sha()
+            revert_pull_number = os.environ.get('PR_ID')
             pr_data = github_app.get_pr_details(revert_pull_number)
             #base_branch = pr_data["base"]["ref"]
             pull_commit_id = pr_data["head"]["sha"]
