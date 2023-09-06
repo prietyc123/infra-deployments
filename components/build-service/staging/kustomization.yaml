@@ -4,4 +4,4 @@ resources:
 - ../base
 - ../base/external-secrets
 
-#hello test staging pipeline
+#hello test
