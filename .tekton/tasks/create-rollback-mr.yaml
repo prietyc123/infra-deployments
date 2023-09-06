@@ -162,30 +162,24 @@ spec:
                     headers={
                         "Accept": "application/vnd.github.v3+json"
                     })
-                json_output = req.json()["items"][0]["number"]
-                print(json_output)
-                return json_output
-
-            def create_revert_pr(self, revert_pull_number, description):
+                pr_id = req.json()["items"][0]["number"]
+                print(pr_id)
+                return pr_id
+            
+            def get_pr_details(self, pr_id):
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 req = self._request(
-                    "POST",
-                    f"/repos/{target_gh_repo}/pulls/{revert_pull_number}/revert",
+                    "GET",
+                    f"/repos/{target_gh_repo}/pulls/{pr_id}",
                     headers={
                         "Authorization": f"Bearer {self.token}",
                         "Accept": "application/vnd.github.v3+json"
-                    },
-                    data={
-                        "head": repo_name,
-                        "base": "preview-POCPromotionToProd",
-                        "title": f"Rollback commit {commit}",
-                        "body": f"Revert pr {revert_pull_number} with {description}"
-                        "maintainer_can_modify": False
                     })
-                json_output = req.json()
-                print(json_output)
+                pull_request_data = req.json()
+                print(pull_request_data)
+                return pull_request_data
 
-            def create_mr(self):
+            def create_mr(self, base_branch, pr_id):
                 repo_name = "rollback-" + os.environ.get('REVISION')[:12]
                 commit = os.environ.get('REVISION')[:12]
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
@@ -198,34 +192,46 @@ spec:
                     },
                     data={
                         "head": repo_name,
-                        "base": "preview-POCPromotionToProd",
+                        "base": f"{base_branch}",
                         "title": f"Rollback commit {commit}",
-                        "maintainer_can_modify": False
+                        "body": f"This PR reverts changes from PR #{pr_id}."
                     })
-                json_output = req.json()
-                print(json_output)
-                return json_output
+                if req.status_code == 201:
+                    pr_data = req.json()
+                    pr_number = pr_data["number"]
+                    print(f"Reverted changes from PR #{pr_id} in a new pull request #{pr_number}.")
+                else:
+                    print(f"Failed to create a new pull request. Status code: {req.status_code}")
 
-            def create_reset_branch(self):
+            def create_reset_branch(self, base_branch):
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
-                target_branch = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/{branch}").json()
+                # target_branch = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/{branch}").json()
                 # main_branch_sha = self._request("GET", f"/repos/{target_gh_repo}/git/refs/heads/main").json()['object']['sha']
-                main_branch_sha = os.environ.get('REVISION')
-                if "ref" in target_branch:
-                    # update branch
-                    self._request(
-                        "PATCH",
-                        f"/repos/{target_gh_repo}/git/refs/heads/{branch}",
-                        data={"sha": main_branch_sha, "force": True}
-                    )
-                else:
-                    # create branch
-                    self._request(
-                        "POST",
-                        f"/repos/{target_gh_repo}/git/refs",
-                        data={"sha": main_branch_sha, "ref": f"refs/heads/{branch}"}
-                    )
+                # create branch
+                self._request(
+                    "POST",
+                    f"/repos/{target_gh_repo}/git/refs",
+                    headers={
+                        "Authorization": f"Bearer {self.token}",
+                        "Accept": "application/vnd.github.v3+json"
+                    },
+                    data={"sha": f"{base_branch}", "ref": f"refs/heads/{branch}"}
+                )
+                # if "ref" in target_branch:
+                #     # update branch
+                #     self._request(
+                #         "PATCH",
+                #         f"/repos/{target_gh_repo}/git/refs/heads/{branch}",
+                #         data={"sha": main_branch_sha, "force": True}
+                #     )
+                # else:
+                #     # create branch
+                #     self._request(
+                #         "POST",
+                #         f"/repos/{target_gh_repo}/git/refs",
+                #         data={"sha": main_branch_sha, "ref": f"refs/heads/{branch}"}
+                #     )
             def upload_content(self):
               branch = "rollback-" + os.environ.get('REVISION')[:12]
               target_gh_repo = os.environ.get('TARGET_GH_REPO')
@@ -290,10 +296,11 @@ spec:
                 app_id=app_id,
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
 
-            github_app.create_reset_branch()
             revert_pull_number = github_app.list_pulls_associated_with_sha()
-            description = f"Rollback PR for commit: {commit}"
-            github_app.create_revert_pr(revert_pull_number, description)
+            pr_data = github_app.get_pr_details(revert_pull_number)
+            base_branch = pr_data["base"]["ref"]
+            github_app.create_reset_branch(base_branch)
+            github_app.create_mr(base_branch, revert_pull_number)
             # github_app.revert_mr()
             # github_app.upload_content()
             # time.sleep(30)
