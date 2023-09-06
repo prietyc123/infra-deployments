@@ -46,19 +46,16 @@ spec:
             secretKeyRef:
               name: stage-test-e2e
               key: ssourl
-      env:
         - name: STAGE_APIURL
           valueFrom:
             secretKeyRef:
               name: stage-test-e2e
               key: apiurl
-      env:
         - name: STAGEUSER_TOKEN
           valueFrom:
             secretKeyRef:
               name: stage-test-e2e
               key: token
-      env:
         - name: STAGE_USERNAME
           valueFrom:
             secretKeyRef:
