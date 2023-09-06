@@ -133,9 +133,9 @@ spec:
                                         headers=headers,
                                         data=json.dumps(data))
             
-            def revert_mr(self):
-                commit = os.environ.get('REVISION')
-                cmd = ['git', 'revert', '-m', '1', f"{commit}", "--no-edit"]
+            def revert_mr(self, pull_commit_id):
+                # commit = os.environ.get('REVISION')
+                cmd = ['git', 'revert', '-m', '1', f"{pull_commit_id}", "--no-edit"]
                 cmd_string = " ".join(cmd)
                 output = subprocess.Popen(cmd_string.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = output.communicate()
@@ -196,12 +196,14 @@ spec:
                         "title": f"Rollback commit {commit}",
                         "body": f"This PR reverts changes from PR #{pr_id}."
                     })
-                if req.status_code == 201:
-                    pr_data = req.json()
-                    pr_number = pr_data["number"]
-                    print(f"Reverted changes from PR #{pr_id} in a new pull request #{pr_number}.")
-                else:
-                    print(f"Failed to create a new pull request. Status code: {req.status_code}")
+                json_data = req.json()
+                print(json_data)
+                # if req.status_code == 201:
+                #     pr_data = req.json()
+                #     pr_number = pr_data["number"]
+                #     print(f"Reverted changes from PR #{pr_id} in a new pull request #{pr_number}.")
+                # else:
+                #     print(f"Failed to create a new pull request. Status code: {req.status_code}")
 
             def create_reset_branch(self, base_branch):
                 branch = "rollback-" + os.environ.get('REVISION')[:12]
@@ -299,10 +301,11 @@ spec:
             revert_pull_number = github_app.list_pulls_associated_with_sha()
             pr_data = github_app.get_pr_details(revert_pull_number)
             base_branch = pr_data["base"]["ref"]
+            pull_commit_id = pr_data["head"]["sha"]
             github_app.create_reset_branch(base_branch)
+            github_app.revert_mr(pull_commit_id)
+            github_app.upload_content()
             github_app.create_mr(base_branch, revert_pull_number)
-            # github_app.revert_mr()
-            # github_app.upload_content()
             # time.sleep(30)
             # infra_pr = github_app.create_mr()
             # if "url" not in infra_pr:
