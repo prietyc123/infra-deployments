@@ -222,14 +222,12 @@ spec:
                 #     data={"sha": main_branch_sha, "ref": f"refs/heads/{branch}"}
                 # )
                 if "ref" in target_branch:
-                    logger.info("Update branch %s", branch)
                     self._request(
                         "PATCH",
                         f"/repos/{target_gh_repo}/git/refs/heads/{branch}",
                         data={"sha": main_branch_sha, "force": True}
                     )
                 else:
-                    logger.info("Create branch %s", branch)
                     self._request(
                         "POST",
                         f"/repos/{target_gh_repo}/git/refs",
