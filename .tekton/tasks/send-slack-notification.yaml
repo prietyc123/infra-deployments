@@ -38,10 +38,10 @@ spec:
         echo "Setting icon and run status in message"
         MSG="$(params.MESSAGE)"
         if [[ "${status}" == *"Failed: 0"* ]]; then
-          MSG="${MSG//<icon>/:rainbow_2:}"
+          MSG="${MSG//<icon>/:success-kid:}"
           MSG="${MSG//<run_status>/succeeded}"
         else
-          MSG="${MSG//<icon>/:volcano:}"
+          MSG="${MSG//<icon>/:fuuuuuu:}"
           MSG="${MSG//<run_status>/failed}"
         fi
 
