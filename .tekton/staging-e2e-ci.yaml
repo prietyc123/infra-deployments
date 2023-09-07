@@ -31,7 +31,7 @@ spec:
     - name: revision
       value: "{{ revision }}"
     - name: SEND_SLACK_NOTIFICATION
-      value: "true"
+      value: "false"
   pipelineRef:
     name: staging-hac-e2e-test
   workspaces:
