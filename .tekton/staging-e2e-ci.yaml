@@ -20,10 +20,9 @@ metadata:
     pipelinesascode.tekton.dev/task-4: "[.tekton/tasks/send-slack-notification.yaml]"
     pipelinesascode.tekton.dev/task-5: "[.tekton/tasks/get-pr-commit-message.yaml]"
     pipelinesascode.tekton.dev/task-6: "[.tekton/tasks/rollback-argocd-app.yaml]"
-    pipelinesascode.tekton.dev/task-7: "[.tekton/tasks/create-rollback-mr.yaml]"
-    pipelinesascode.tekton.dev/task-8: "[.tekton/tasks/get-pr-number.yaml]"
-    pipelinesascode.tekton.dev/task-9: "[git-clone]"
-    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/task-7: "[.tekton/tasks/get-pr-number.yaml]"
+    pipelinesascode.tekton.dev/task-8: "[git-clone]"
+    pipelinesascode.tekton.dev/max-keep-runs: "10"
 spec:
   params:
     - name: repo_url

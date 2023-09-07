@@ -125,22 +125,6 @@ spec:
         - input: $(tasks.stage-verify-e2e-test.status)
           operator: in
           values: ["Failed"]
-    - name: create-rollback-mr
-      taskRef:
-        name: create-rollback-mr
-      params:
-        - name: pr_id
-          value: $(tasks.get-pr-number.results.pr_id)
-        - name: REVISION
-          value: $(params.revision)
-      workspaces:
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-      when:
-        - input: $(tasks.stage-verify-e2e-test.status)
-          operator: in
-          values: ["Failed"]
     - name: send-slack-notification
       taskRef:
         name: send-slack-notification
