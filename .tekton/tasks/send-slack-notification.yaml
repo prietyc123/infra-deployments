@@ -56,10 +56,15 @@ spec:
         MSG="${MSG//<tag_ic>/$tag_ic}"
 
         echo "Sending message to Slack"
-        curl --no-progress-meter -X POST -H 'Content-Type: application/json' --data "{\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"${MSG}\"}}]}" "${URL}"
+        curl --no-progress-meter -X POST -H 'Authorization: Bearer ${TOKEN}' -H 'Content-Type: application/json' --data "{\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"${MSG}\"}}]}" "${URL}"
       env:
         - name: URL
           valueFrom:
             secretKeyRef:
               name: $(params.SECRET_NAME)
               key: slack_webhook_url
+        - name: TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: $(params.SECRET_NAME)
+              key: token
