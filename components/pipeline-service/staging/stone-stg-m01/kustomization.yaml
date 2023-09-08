@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
   - staging-build.yaml
 
-#test staging 123
+#test staging 123 test pipeline
