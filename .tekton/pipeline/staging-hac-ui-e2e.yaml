@@ -36,6 +36,18 @@ spec:
         workspace: git
         subPath: infra-deployment-git
       timeout: 10m
+    - name: test-channel
+      taskRef:
+        name: test-channel
+      params:
+        - name: REVISION
+          value: $(params.revision)
+      workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      runAfter:
+        - clone-infra-deployment-git
     - name: get-pr-number
       taskRef:
         name: get-pr-number
