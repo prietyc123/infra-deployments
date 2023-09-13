@@ -19,7 +19,8 @@ metadata:
     pipelinesascode.tekton.dev/task-5: "[.tekton/tasks/get-pr-commit-message.yaml]"
     pipelinesascode.tekton.dev/task-6: "[.tekton/tasks/rollback-argocd-app.yaml]"
     pipelinesascode.tekton.dev/task-7: "[.tekton/tasks/get-pr-number.yaml]"
-    pipelinesascode.tekton.dev/task-8: "[git-clone]"
+    pipelinesascode.tekton.dev/task-8: "[.tekton/tasks/test-channel.yaml]"
+    pipelinesascode.tekton.dev/task-9: "[git-clone]"
     pipelinesascode.tekton.dev/max-keep-runs: "10"
 spec:
   params:
