@@ -8,7 +8,7 @@ metadata:
       (
         "**/staging/**".pathChanged() ||
         "argo-cd-apps/app-of-app-sets/base/**".pathChanged() ||
-        "components/*/base/**".pathChanged()
+        "components/*/base/**".matches(pathChanged())
       )
     pipelinesascode.tekton.dev/pipeline: "[.tekton/pipeline/staging-hac-ui-e2e.yaml]"
     pipelinesascode.tekton.dev/task: "[.tekton/tasks/login-argocd.yaml]"
