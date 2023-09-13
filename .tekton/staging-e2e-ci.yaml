@@ -10,8 +10,6 @@ metadata:
         "argo-cd-apps/app-of-app-sets/base/**".pathChanged() ||
         "components/**/base/**".pathChanged()
       )
-    pipelinesascode.tekton.dev/on-event: "[push]"
-    pipelinesascode.tekton.dev/on-target-branch: "[preview-POCPromotionToProd]"
     pipelinesascode.tekton.dev/pipeline: "[.tekton/pipeline/staging-hac-ui-e2e.yaml]"
     pipelinesascode.tekton.dev/task: "[.tekton/tasks/login-argocd.yaml]"
     pipelinesascode.tekton.dev/task-1: "[.tekton/tasks/sync-argocd-app.yaml]"
