@@ -4,7 +4,7 @@ metadata:
   generateName: staging-hac-e2e-
   annotations:
     pipelinesascode.tekton.dev/on-cel-expression: |
-      event == "push" && target_branch == "preview-POCPromotionToProd" &&
+      event == "push" && target_branch == "[refs/heads/*]" &&
       (
         "**/staging/**".pathChanged() ||
         "argo-cd-apps/app-of-app-sets/base/**".pathChanged() ||
