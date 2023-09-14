@@ -1,0 +1,31 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: test-channel
+spec:
+  description: >-
+    This task is for rollback the failed application in the staging environment using history, except the operator rollback
+  params:
+    - name: revision
+  workspaces:
+   - name: infra-deployment-git
+  steps:
+    - name: channel
+      image: quay.io/devtools_gitops/test_image:4.0.5
+      workingDir: $(workspaces.infra-deployment-git.path)
+      script: |
+        #!/usr/bin/env sh
+        set -u -o pipefail
+
+        filePath="$(pwd)/components/pipeline-service/staging/stone-stg-m01/staging-build.yaml"
+
+        echo "$filePath"
+        echo "check whether the application has operator upgrade"
+        git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
+        output=$(git diff $(params.revision)^ $(params.revision) -- "$filePath" | grep -qE '^-.*channel:|^\+.*channel:')
+        echo "hello ${output}"
+        if [[ $(git diff $(params.revision)^ $(params.revision) -- "$filePath" | grep -qE '^-.*channel:|^\+.*channel:') ]]; then
+          echo "Rollback is not possible for operator upgrade"
+        else
+          echo "hello ${output}"
+        fi

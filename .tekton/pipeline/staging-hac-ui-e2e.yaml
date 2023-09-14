@@ -13,12 +13,12 @@ spec:
     - name: git
     - name: shared-workspace
   tasks:
-    - name: staging-argocd-login
-      taskRef:
-        name: login-argocd
-      workspaces:
-        - name: output
-          workspace: shared-workspace
+    # - name: staging-argocd-login
+    #   taskRef:
+    #     name: login-argocd
+    #   workspaces:
+    #     - name: output
+    #       workspace: shared-workspace
     - name: clone-infra-deployment-git
       taskRef:
         name: git-clone
@@ -36,11 +36,11 @@ spec:
         workspace: git
         subPath: infra-deployment-git
       timeout: 10m
-    - name: get-pr-number
+    - name: test-channel
       taskRef:
-        name: get-pr-number
+        name: test-channel
       params:
-        - name: REVISION
+        - name: revision
           value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
@@ -48,93 +48,121 @@ spec:
           subPath: infra-deployment-git
       runAfter:
         - clone-infra-deployment-git
-    - name: get-pr-changed-files-path
-      taskRef:
-        name: get-pr-changed-files
-      params:
-        - name: revision
-          value: $(params.revision)
-      runAfter:
-        - clone-infra-deployment-git
-      workspaces:
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-    - name: staging-argocd-app-sync
-      taskRef:
-        name: app-sync
-      workspaces:
-        - name: argocd-config
-          workspace: shared-workspace
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-      runAfter:
-        - get-pr-changed-files-path
-        - staging-argocd-login
-    - name: argocd-app-synced-healthy
-      taskRef:
-        name: argocd-app-health-check
-      workspaces:
-        - name: argocd-config
-          workspace: shared-workspace
-      runAfter:
-        - staging-argocd-app-sync
-    - name: clone-stage-e2e-git
-      taskRef:
-        name: git-clone
-      params:
-        - name: url
-          value: 'https://github.com/sawood14012/e2e-tests.git'
-        - name: deleteExisting
-          value: "true"
-        - name: revision
-          value: "verify-stage"
-      workspaces:
-      - name: output
-        workspace: git
-        subPath: stage-e2e-git
-      timeout: 10m
-    - name: stage-verify-e2e-test
-      taskRef:
-        name: stage-verify-e2e-test
-      params:
-      - name: TASK_RETRIES
-        value: "$(context.pipelineTask.retries)"
-      workspaces:
-      - name: stage-e2e-git
-        workspace: git
-        subPath: stage-e2e-git
-      runAfter:
-        - argocd-app-synced-healthy
-        - clone-stage-e2e-git
-  finally:
-    - name: rollback-argocd-app
-      taskRef:
-        name: rollback-argocd-app
-      params:
-        - name: revision
-          value: $(params.revision)
-      workspaces:
-        - name: argocd-config
-          workspace: shared-workspace
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-      when:
-        - input: $(tasks.stage-verify-e2e-test.status)
-          operator: in
-          values: ["Failed"]
-    - name: send-slack-notification
-      taskRef:
-        name: send-slack-notification
-      params:
-        - name: pr_id
-          value: $(tasks.get-pr-number.results.pr_id)
-        - name: MESSAGE
-          value: |
-            <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|logs> <tag_ic>
-      when:
-        - input: $(params.SEND_SLACK_NOTIFICATION)
-          operator: in
-          values: ["true"]
+  #   - name: get-pr-number
+  #     taskRef:
+  #       name: get-pr-number
+  #     params:
+  #       - name: REVISION
+  #         value: $(params.revision)
+  #     workspaces:
+  #       - name: infra-deployment-git
+  #         workspace: git
+  #         subPath: infra-deployment-git
+  #     runAfter:
+  #       - clone-infra-deployment-git
+  #   - name: get-pr-changed-files-path
+  #     taskRef:
+  #       name: get-pr-changed-files
+  #     params:
+  #       - name: revision
+  #         value: $(params.revision)
+  #     runAfter:
+  #       - clone-infra-deployment-git
+  #     workspaces:
+  #       - name: infra-deployment-git
+  #         workspace: git
+  #         subPath: infra-deployment-git
+  #   - name: staging-argocd-app-sync
+  #     taskRef:
+  #       name: app-sync
+  #     workspaces:
+  #       - name: argocd-config
+  #         workspace: shared-workspace
+  #       - name: infra-deployment-git
+  #         workspace: git
+  #         subPath: infra-deployment-git
+  #     runAfter:
+  #       - get-pr-changed-files-path
+  #       - staging-argocd-login
+  #   - name: argocd-app-synced-healthy
+  #     taskRef:
+  #       name: argocd-app-health-check
+  #     workspaces:
+  #       - name: argocd-config
+  #         workspace: shared-workspace
+  #     runAfter:
+  #       - staging-argocd-app-sync
+  #   - name: clone-stage-e2e-git
+  #     taskRef:
+  #       name: git-clone
+  #     params:
+  #       - name: url
+  #         value: 'https://github.com/sawood14012/e2e-tests.git'
+  #       - name: deleteExisting
+  #         value: "true"
+  #       - name: revision
+  #         value: "verify-stage"
+  #     workspaces:
+  #     - name: output
+  #       workspace: git
+  #       subPath: stage-e2e-git
+  #     timeout: 10m
+  #   - name: stage-verify-e2e-test
+  #     taskRef:
+  #       name: stage-verify-e2e-test
+  #     params:
+  #     - name: TASK_RETRIES
+  #       value: "$(context.pipelineTask.retries)"
+  #     workspaces:
+  #     - name: stage-e2e-git
+  #       workspace: git
+  #       subPath: stage-e2e-git
+  #     runAfter:
+  #       - argocd-app-synced-healthy
+  #       - clone-stage-e2e-git
+  # finally:
+  #   - name: rollback-argocd-app
+  #     taskRef:
+  #       name: rollback-argocd-app
+  #     params:
+  #       - name: revision
+  #         value: $(params.revision)
+  #     workspaces:
+  #       - name: argocd-config
+  #         workspace: shared-workspace
+  #       - name: infra-deployment-git
+  #         workspace: git
+  #         subPath: infra-deployment-git
+  #     when:
+  #       - input: $(tasks.stage-verify-e2e-test.status)
+  #         operator: in
+  #         values: ["Failed"]
+  #   - name: rollback-argocd-app-2
+  #     taskRef:
+  #       name: rollback-argocd-app
+  #     params:
+  #       - name: revision
+  #         value: $(params.revision)
+  #     workspaces:
+  #       - name: argocd-config
+  #         workspace: shared-workspace
+  #       - name: infra-deployment-git
+  #         workspace: git
+  #         subPath: infra-deployment-git
+  #     when:
+  #       - input: $(tasks.argocd-app-synced-healthy.status)
+  #         operator: in
+  #         values: ["Failed"]
+  #   - name: send-slack-notification
+  #     taskRef:
+  #       name: send-slack-notification
+  #     params:
+  #       - name: pr_id
+  #         value: $(tasks.get-pr-number.results.pr_id)
+  #       - name: MESSAGE
+  #         value: |
+  #           <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|View logs> <tag_ic>
+  #     when:
+  #       - input: $(params.SEND_SLACK_NOTIFICATION)
+  #         operator: in
+  #         values: ["true"]

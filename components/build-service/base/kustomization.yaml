@@ -21,4 +21,4 @@ images:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-#test123 slack
+#test123 staging test123 staging base testing

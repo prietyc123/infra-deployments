@@ -8,10 +8,8 @@ metadata:
       (
         "**/staging/**".pathChanged() ||
         "argo-cd-apps/app-of-app-sets/base/**".pathChanged() ||
-        "components/**/base/**".pathChanged()
+        "components/*/base/**".pathChanged()
       )
-    pipelinesascode.tekton.dev/on-event: "[push]"
-    pipelinesascode.tekton.dev/on-target-branch: "[preview-POCPromotionToProd]"
     pipelinesascode.tekton.dev/pipeline: "[.tekton/pipeline/staging-hac-ui-e2e.yaml]"
     pipelinesascode.tekton.dev/task: "[.tekton/tasks/login-argocd.yaml]"
     pipelinesascode.tekton.dev/task-1: "[.tekton/tasks/sync-argocd-app.yaml]"
@@ -21,7 +19,8 @@ metadata:
     pipelinesascode.tekton.dev/task-5: "[.tekton/tasks/get-pr-commit-message.yaml]"
     pipelinesascode.tekton.dev/task-6: "[.tekton/tasks/rollback-argocd-app.yaml]"
     pipelinesascode.tekton.dev/task-7: "[.tekton/tasks/get-pr-number.yaml]"
-    pipelinesascode.tekton.dev/task-8: "[git-clone]"
+    pipelinesascode.tekton.dev/task-8: "[.tekton/tasks/test-channel.yaml]"
+    pipelinesascode.tekton.dev/task-9: "[git-clone]"
     pipelinesascode.tekton.dev/max-keep-runs: "10"
 spec:
   params:

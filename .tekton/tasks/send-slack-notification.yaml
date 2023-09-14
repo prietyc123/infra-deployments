@@ -41,19 +41,20 @@ spec:
         if [[ "${status}" == *"Failed: 0"* ]]; then
           MSG="${MSG//<icon>/:success-kid:}"
           MSG="${MSG//<run_status>/succeeded}"
+          MSG="${MSG//<tag_ic>/}"
         else
           MSG="${MSG//<icon>/:fuuuuuu:}"
           MSG="${MSG//<run_status>/failed}"
+          MSG="${MSG//<tag_ic>/@ic-appstudio-qe}"
         fi
 
-        tag_ic="@ic-appstudio-qe"
+        
         prUrl="https://github.com/$(params.TARGET_GH_REPO)/pull/$(params.pr_id)"
 
-        echo "Setting logs URL, pipeline run name and tagging IC in message"
+        echo "Setting logs URL, pull request number and pipeline run name in message"
         MSG="${MSG//<logs_url>/$logsUrl}"
         MSG="${MSG//<pr_url>/$prUrl}"
         MSG="${MSG//<pr_name>/$pipelineRunName}"
-        MSG="${MSG//<tag_ic>/$tag_ic}"
 
         echo "Sending message to Slack"
         curl --no-progress-meter -X POST -H 'Content-Type: application/json' --data "{\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"${MSG}\"}}]}" "${URL}"
