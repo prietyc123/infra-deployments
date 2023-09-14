@@ -40,7 +40,7 @@ spec:
       taskRef:
         name: test-channel
       params:
-        - name: REVISION
+        - name: revision
           value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
