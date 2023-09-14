@@ -19,11 +19,12 @@ spec:
 
         filePath="$(pwd)/components/pipeline-service/staging/stone-stg-m01/staging-build.yaml"
 
+        echo "$filePath"
         echo "check whether the application has operator upgrade"
         git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
-        output=$(git diff $(params.revision)^ $(params.revision) -- $filePath | grep -qE '^-.*channel:|^\+.*channel:')
+        output=$(git diff $(params.revision)^ $(params.revision) -- "$filePath" | grep -qE '^-.*channel:|^\+.*channel:')
         echo "hello ${output}"
-        if [ $(git diff $(params.revision)^ $(params.revision) -- $filePath | grep -qE '^-.*channel:|^\+.*channel:') ]; then
+        if [[ $(git diff $(params.revision)^ $(params.revision) -- "$filePath" | grep -qE '^-.*channel:|^\+.*channel:') ]]; then
           echo "Rollback is not possible for operator upgrade"
         else
           echo "hello ${output}"
