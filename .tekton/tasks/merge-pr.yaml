@@ -1,0 +1,215 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: merge-pr
+spec:
+  description: |
+    merge the pull request into main branch.
+  params:
+    - name: pull_request_number
+    - name: REVISION
+      description: Git reference which was built by the Pipeline
+    - name: TARGET_GH_OWNER
+      description: Owner of GitHub repository of the infra-deployments code
+      default: prietyc123
+    - name: TARGET_GH_REPO
+      description: GitHub repository of the infra-deployments code
+      default: infra-deployments
+    - name: shared-secret
+      default: infra-deployments-pr-creator
+      description: secret in the namespace which contains private key for the GitHub App
+    - name: source_branch
+    - name: GITHUB_APP_ID
+      description: ID of Github app used for updating PR
+      default: "288147"
+    - name: GITHUB_APP_INSTALLATION_ID
+      description: Installation ID of Github app in the organization
+      default: "33726981"
+  workspaces:
+   - name: infra-deployment-git
+  volumes:
+    - name: infra-deployments-pr-creator
+      secret:
+        # 'private-key' - private key for Github app
+        secretName: $(params.shared-secret)
+  steps:
+    - name: merge-pull-request
+      image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
+      workingDir: $(workspaces.infra-deployment-git.path)
+      volumeMounts:
+        - name: infra-deployments-pr-creator
+          mountPath: /secrets/deploy-key
+      env:
+        - name: GITHUBAPP_KEY_PATH
+          value: /secrets/deploy-key/private-key
+        - name: GITHUBAPP_APP_ID
+          value: "$(params.GITHUB_APP_ID)"
+        - name: GITHUBAPP_INSTALLATION_ID
+          value: "$(params.GITHUB_APP_INSTALLATION_ID)"
+        - name: GITHUB_API_URL
+          value: https://api.github.com
+        - name: GITHUB_GRAPHQL_API_URL
+          value: https://api.github.com/graphql
+        - name: PULL_REQUEST_NUMBER
+          value: $(params.pull_request_number)
+        - name: REVISION
+          value: $(params.REVISION)
+        - name: SOURCE_BRANCH
+          value: $(params.source_branch)
+        - name: TARGET_GH_OWNER
+          value: "$(params.TARGET_GH_OWNER)"
+        - name: TARGET_GH_REPO
+          value: "$(params.TARGET_GH_REPO)"
+      script: |
+        #!/usr/bin/env python3
+        import json
+        import os
+        import time
+        import base64
+        import subprocess
+        import requests
+        from jwcrypto import jwk, jwt
+        EXPIRE_MINUTES_AS_SECONDS = int(os.environ.get('GITHUBAPP_TOKEN_EXPIRATION_MINUTES', 10)) * 60
+        # TODO support github enterprise
+        GITHUB_API_URL = os.environ.get('GITHUB_API_URL')
+        GITHUB_GRAPHQL_API_URL = os.environ.get('GITHUB_GRAPHQL_API_URL')
+        class GitHub():
+            token = None
+            def __init__(self, private_key, app_id=None, installation_id=None):
+                if not isinstance(private_key, bytes):
+                    raise ValueError(f'"{private_key}" parameter must be byte-string')
+                self._private_key = private_key
+                self.app_id = app_id
+                self.token = self._get_token(installation_id)
+            def _load_private_key(self, pem_key_bytes):
+                return jwk.JWK.from_pem(pem_key_bytes)
+            def _app_token(self, expire_in=EXPIRE_MINUTES_AS_SECONDS):
+                key = self._load_private_key(self._private_key)
+                now = int(time.time())
+                token = jwt.JWT(
+                    header={"alg": "RS256"},
+                    claims={
+                        "iat": now,
+                        "exp": now + expire_in,
+                        "iss": self.app_id
+                    },
+                    algs=["RS256"],
+                )
+                token.make_signed_token(key)
+                return token.serialize()
+            def _get_token(self, installation_id=None):
+                app_token = self._app_token()
+                if not installation_id:
+                    return app_token
+                req = self._request(
+                    "POST",
+                    f"/app/installations/{installation_id}/access_tokens",
+                    headers={
+                        "Authorization": f"Bearer {app_token}",
+                        "Accept": "application/vnd.github.machine-man-preview+json"
+                    })
+                ret = req.json()
+                if 'token' not in ret:
+                    raise Exception(f"Authentication errors: {ret}")
+                return ret['token']
+            def _request(self, method, url, headers={}, data={}):
+                if self.token and 'Authorization' not in headers:
+                    headers.update({"Authorization": "Bearer " + self.token})
+                if not url.startswith("http"):
+                    url = f"{GITHUB_API_URL}{url}"
+                return requests.request(method,
+                                        url,
+                                        headers=headers,
+                                        data=json.dumps(data))
+            def run_query(self, query, variables, headers={}):
+                if self.token and 'Authorization' not in headers:
+                      headers.update({"Authorization": "Bearer " + self.token})
+                url = f"{GITHUB_GRAPHQL_API_URL}"
+                request = requests.post(url, json={'query': query, 'variables': variables}, headers=headers)
+                if request.status_code == 200:
+                    return request.json()
+                else:
+                    raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
+
+            def get_pr_id_branch_oid(self):
+                target_gh_owner = os.environ.get('TARGET_GH_OWNER')
+                target_gh_repo = os.environ.get('TARGET_GH_REPO')
+                pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
+                source_branch = os.environ.get('SOURCE_BRANCH')
+                get_pr_id_branch_oid_query_variables = {
+                  "owner": f"{target_gh_owner}",
+                  "repo": f"{target_gh_repo}",
+                  "pr_number": int(f"{pull_request_number}"),
+                  "source_branch_name": f"{source_branch}",
+                }
+                get_pr_id_branch_oid_query = """
+                query GetPullRequestIDs($owner:String!, $repo:String!, $pr_number:Int!, $source_branch_name:String!) {
+                  repository(owner:$owner, name:$repo) {
+                    pullRequest(number: $pr_number) {
+                      id
+                    }
+                    ref(qualifiedName: $source_branch_name) {
+                      target {
+                        oid
+                      }
+                    }
+                  }
+                }
+                """
+                result = self.run_query(
+                    get_pr_id_branch_oid_query,
+                    get_pr_id_branch_oid_query_variables,
+                    headers={
+                        "Authorization": f"Bearer {self.token}"
+                    })
+                pr_id = result["data"]["repository"]["pullRequest"]["id"]
+                source_branch_oid = result["data"]["repository"]["ref"]["target"]["oid"]
+                return pr_id, source_branch_oid
+
+            def merge_pr(self, pr_id, source_branch_oid):
+                merge_pr_varaibles = {
+                  "pullrequest_id": str(pr_id),
+                  "expectedHeadOid": source_branch_oid,
+                  "mergeMethod" : 'MERGE',
+                }
+
+                merge_pr_mutation = """
+                mutation MergePullRequest($pullrequest_id:ID!, $expectedHeadOid:GitObjectID, $mergeMethod:PullRequestMergeMethod) {
+                  mergePullRequest(input:{pullRequestId: $pullrequest_id, expectedHeadOid: $expectedHeadOid, mergeMethod: $mergeMethod}) {
+                    clientMutationId
+                    pullRequest {
+                      id
+                    }
+                  }
+                }
+                """
+
+                result = self.run_query(
+                    merge_pr_mutation,
+                    merge_pr_mutation,
+                    headers={
+                        "Authorization": f"Bearer {self.token}"
+                    })
+                if "errors" in result.keys():
+                    for error in result["errors"]:
+                        print("ERROR: {0}".format(error["message"]))
+                else:
+                    print("SUCCESS: merged PR id {0}".format(result["data"]["mergePullRequest"]["pullRequest"]["id"]))
+
+
+        def main():
+            with open(os.environ['GITHUBAPP_KEY_PATH'], 'rb') as key_file:
+                key = key_file.read()
+            if os.environ.get('GITHUBAPP_APP_ID'):
+                app_id = os.environ['GITHUBAPP_APP_ID']
+            else:
+                raise Exception("application id is not set")
+            print(f"Getting user token for application_id: {app_id}")
+            github_app = GitHub(
+                key,
+                app_id=app_id,
+                installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
+            pr_id, source_branch_oid = github_app.get_pr_id_branch_oid()
+            github_app.merge_pr(pr_id, source_branch_oid)
+        if __name__ == '__main__':
+            main()

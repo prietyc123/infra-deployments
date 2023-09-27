@@ -1,0 +1,41 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: app-sync
+spec:
+  description: >-
+    This task is for syncing the staging cluster argocd application
+  workspaces:
+   - name: infra-deployment-git
+   - name: shared-file-path
+  steps:
+    - name: argocd-app-sync
+      image: quay.io/openshift-pipeline/ci
+      workingDir: $(workspaces.infra-deployment-git.path)
+      script: |
+        #!/usr/bin/env sh
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        # Read each line from the component file, which has all the application details from sync app task e.g {pipeline-service: pipeline-service-stone-stg-m01}
+        while IFS= read -r line
+        do
+          component="$line"
+          component=$(echo -e "$component" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          
+          # Set the delimiter to separate componentapp and app name
+          IFS=":"
+          read -ra app <<< "$component"
+
+          app_directory=$(find "$(pwd)/argo-cd-apps/base" -type d -name ${app[0]})
+
+          # sync the updated Application in argocd
+          oc apply -k $app_directory
+
+          while [ "$(oc get applications.argoproj.io all-application-sets -n openshift-gitops -o jsonpath='{.status.health.status} {.status.sync.status}')" != "Healthy Synced" ]; do
+            echo "Waiting for sync of all-application-sets argoCD app"
+            sleep 5
+          done
+
+        done < "$(workspaces.shared-file-path.path)/component.txt"

@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: get-pr-modified-files
+spec:
+  description: >-
+    This task is for getting all the filepath changed for pull request
+  params:
+    - name: revision
+  workspaces:
+   - name: infra-deployment-git
+   - name: shared-file-path
+  steps:
+    - name: get-merged-pr-files-changed
+      image: quay.io/openshift-pipeline/ci
+      workingDir: $(workspaces.infra-deployment-git.path)
+      script: |
+        #!/usr/bin/env sh
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
+        git diff --name-only $(params.revision)^ $(params.revision) > $(workspaces.shared-file-path.path)/updated_files.txt
+        echo "Updated files:"
+        cat "$(workspaces.shared-file-path.path)/updated_files.txt"
