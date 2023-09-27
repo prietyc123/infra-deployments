@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: login-argocd
+spec:
+  description: >-
+    This task is for login into the staging cluster ArgoCD environment
+  params:
+    - name: ARGOCD_SERVER
+      type: string
+      description: The secret name where you have stored the staging ArgoCD server details `argocd_server`
+      default: argocd-server
+  workspaces:
+    - name: output
+  steps:
+    - name: argocd-staging-login
+      image: quay.io/devtools_gitops/test_image:4.0.5
+      workingDir: /workspace/output
+      script: |
+        #!/usr/bin/env sh
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        # Check if required variables are set
+        if [ -z "$URL" ] || [ -z "$USERNAME" ] || [ -z "$PASSWORD" ]; then
+          echo "Error: One or more required variables are not set."
+          exit 1
+        fi
+        echo "Logging into ArgoCD"
+        if ! argocd login --insecure ${URL} --password ${PASSWORD} --username ${USERNAME} --config "$(pwd)/argocdconfig" --grpc-web; then
+          echo "Error: Failed to log in to ArgoCD."
+          exit 1
+        fi
+        echo "Logged in successfully."
+      env:
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: $(params.ARGOCD_SERVER)
+              key: argocd_server_password
+        - name: USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: $(params.ARGOCD_SERVER)
+              key: argocd_server_username
+        - name: URL
+          valueFrom:
+            secretKeyRef:
+              name: $(params.ARGOCD_SERVER)
+              key: argocd_server_url
