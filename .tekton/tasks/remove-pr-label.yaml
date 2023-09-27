@@ -1,0 +1,88 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: remove-pr-labels
+spec:
+  description: |
+    remove labels from the the pull request for which the test is running on staging.
+  params:
+    - name: pull_request_number
+    - name: match_label
+    - name: TARGET_GH_OWNER
+      description: Owner of GitHub repository of the infra-deployments code
+      default: prietyc123
+    - name: TARGET_GH_REPO
+      description: GitHub repository of the infra-deployments code
+      default: infra-deployments
+  workspaces:
+   - name: shared-file-path
+  steps:
+    - name: remove-pr-label
+      image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
+      workingDir: $(workspaces.shared-file-path.path)
+      env:
+        - name: GITHUB_API_URL
+          value: https://api.github.com
+        - name: PULL_REQUEST_NUMBER
+          value: $(params.pull_request_number)
+        - name: TARGET_GH_OWNER
+          value: "$(params.TARGET_GH_OWNER)"
+        - name: TARGET_GH_REPO
+          value: "$(params.TARGET_GH_REPO)"
+      script: |
+        #!/usr/bin/env python3
+        import json
+        import os
+        import requests
+
+        GITHUB_API_URL = os.environ.get('GITHUB_API_URL')
+
+        def _request(method, url, headers={}, data={}):
+                if not url.startswith("http"):
+                    url = f"{GITHUB_API_URL}{url}"
+                return requests.request(method,
+                                        url,
+                                        headers=headers,
+                                        data=json.dumps(data))
+
+        def get_labels(token):
+                target_gh_owner = os.environ.get('TARGET_GH_OWNER')
+                target_gh_repo = os.environ.get('TARGET_GH_REPO')
+                pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
+                req = _request(
+                    "GET",
+                    f"/repos/{target_gh_owner}/{target_gh_repo}/issues/{pull_request_number}",
+                    headers={
+                        "Authorization": f"Bearer {token}"
+                    })
+                data = response.json()
+                labels_name = [label["name"] for label in data["labels"]]
+                return label_names
+
+        def remove_label(label_names, token):
+                target_gh_owner = os.environ.get('TARGET_GH_OWNER')
+                target_gh_repo = os.environ.get('TARGET_GH_REPO')
+                pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
+                # Check if the label to remove exists on the pull request
+                if "$(params.match_label)" in label_names:
+                    # Remove the label
+                    label_names.remove("$(params.match_label)")
+
+                    # Update the labels on the pull request
+                    req = _request(
+                        "PATCH",
+                        f"/repos/{target_gh_owner}/{target_gh_repo}/issues/{pull_request_number}",
+                        headers={
+                            "Authorization": f"Bearer {token}"
+                        }),
+                        data={"labels": label_names}
+                    if req.status_code == 200:
+                      print("label $(params.match_label) has been removed successfully")
+                    else:
+                      raise Exception("Failed to remove the label from the pull request.")
+
+        current_dir = os.getcwd()
+        with open(f'{current_dir}/github-token.txt', 'r') as token_file:
+          token = token_file.read()
+        label_names = get_labels(token)
+        remove_label(label_names, token)

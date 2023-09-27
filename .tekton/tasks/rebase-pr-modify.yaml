@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rebase-pr
+spec:
+  description: |
+    rebase the pull request for which the test is running on staging.
+  # params:
+  #   - name: pull_request_number
+  #   - name: TARGET_GH_OWNER
+  #     description: Owner of GitHub repository of the infra-deployments code
+  #     default: prietyc123
+  #   - name: TARGET_GH_REPO
+  #     description: GitHub repository of the infra-deployments code
+  #     default: infra-deployments
+  #   - name: source_branch
+  workspaces:
+   - name: shared-file-path
+   - name: infra-deployment-git
+  steps:
+    - name: rebase-pull-request
+      image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
+      workingDir: $(workspaces.infra-deployment-git.path)
+      script: |
+        #!/usr/bin/env sh
+        set -o errexit
+        set -o nounset
+        
+        GITHUB_TOKEN=$(<'$(workspaces.shared-file-path.path)/github-token.txt')
+        export GITHUB_TOKEN
+        # export GITHUB_TOKEN=$(<'$(workspaces.shared-file-path.path)/github-token.txt')
+        
+        echo "$GITHUB_TOKEN"
+
+        git fetch
+
+        if ! git rebase origin/ImprovedPromotionPoc; then
+          # Handle rebase errors here
+          echo "Error: Git rebase failed."
+          exit 1
+        fi
+        # git rebase origin/ImprovedPromotionPoc
+        
+        echo "Script completed successfully."
