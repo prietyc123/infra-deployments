@@ -1,0 +1,124 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: rebase-pr
+spec:
+  description: |
+    rebase the pull request for which the test is running on staging.
+  params:
+    - name: pull_request_number
+    - name: TARGET_GH_OWNER
+      description: Owner of GitHub repository of the infra-deployments code
+      default: prietyc123
+    - name: TARGET_GH_REPO
+      description: GitHub repository of the infra-deployments code
+      default: infra-deployments
+    - name: source_branch
+  results:
+    - name: source-current-revision
+  workspaces:
+   - name: shared-file-path
+  steps:
+    - name: rebase-pull-request
+      image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
+      workingDir: $(workspaces.shared-file-path.path)
+      env:
+        - name: GITHUB_GRAPHQL_API_URL
+          value: https://api.github.com/graphql
+        - name: PULL_REQUEST_NUMBER
+          value: $(params.pull_request_number)
+        - name: SOURCE_BRANCH
+          value: $(params.source_branch)
+        - name: TARGET_GH_OWNER
+          value: "$(params.TARGET_GH_OWNER)"
+        - name: TARGET_GH_REPO
+          value: "$(params.TARGET_GH_REPO)"
+      script: |
+        #!/usr/bin/env python3
+        import json
+        import os
+        import requests
+        
+        GITHUB_GRAPHQL_API_URL = os.environ.get('GITHUB_GRAPHQL_API_URL')
+        
+        def run_query(query, variables, headers={}):
+                url = f"{GITHUB_GRAPHQL_API_URL}"
+                request = requests.post(url, json={'query': query, 'variables': variables}, headers=headers)
+                if request.status_code == 200:
+                    return request.json()
+                else:
+                    raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
+
+        def get_pr_id_branch_oid(token):
+                target_gh_owner = os.environ.get('TARGET_GH_OWNER')
+                target_gh_repo = os.environ.get('TARGET_GH_REPO')
+                pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
+                source_branch = os.environ.get('SOURCE_BRANCH')
+                get_pr_id_branch_oid_query_variables = {
+                  "owner": f"{target_gh_owner}",
+                  "repo": f"{target_gh_repo}",
+                  "pr_number": int(f"{pull_request_number}"),
+                  "source_branch_name": f"{source_branch}",
+                }
+                get_pr_id_branch_oid_query = """
+                query GetPullRequestIDs($owner:String!, $repo:String!, $pr_number:Int!, $source_branch_name:String!) {
+                  repository(owner:$owner, name:$repo) {
+                    pullRequest(number: $pr_number) {
+                      id
+                    }
+                    ref(qualifiedName: $source_branch_name) {
+                      target {
+                        oid
+                      }
+                    }
+                  }
+                }
+                """
+                result = run_query(
+                    get_pr_id_branch_oid_query,
+                    get_pr_id_branch_oid_query_variables,
+                    headers={
+                        "Authorization": f"Bearer {token}"
+                    })
+                pr_id = result["data"]["repository"]["pullRequest"]["id"]
+                source_branch_oid = result["data"]["repository"]["ref"]["target"]["oid"]
+                return pr_id, source_branch_oid
+
+        def rebase_pr(pr_id, source_branch_oid, token):
+                rebase_pr_varaibles = {
+                  "pullrequest_id": str(pr_id),
+                  "expectedHeadOid": source_branch_oid,
+                  "updateMethod" : 'REBASE',
+                }
+
+                rebase_pr_mutation = """
+                mutation UpdatePullRequestBranch($pullrequest_id:ID!, $expectedHeadOid:GitObjectID, $updateMethod:PullRequestBranchUpdateMethod) {
+                  updatePullRequestBranch(input:{pullRequestId: $pullrequest_id, expectedHeadOid: $expectedHeadOid, updateMethod: $updateMethod}) {
+                    clientMutationId
+                    pullRequest {
+                      id
+                    }
+                  }
+                }
+                """
+
+                result = run_query(
+                    rebase_pr_mutation,
+                    rebase_pr_varaibles,
+                    headers={
+                        "Authorization": f"Bearer {token}"
+                    })
+                if "errors" in result.keys():
+                    for error in result["errors"]:
+                        print("ERROR: {0}".format(error["message"]))
+                else:
+                    print("SUCCESS: Rebased PR id {0}".format(result["data"]["updatePullRequestBranch"]["pullRequest"]["id"]))
+
+        current_dir = os.getcwd()
+        with open(f'{current_dir}/github-token.txt', 'r') as token_file:
+          token = token_file.read()
+        pr_id, source_branch_oid = get_pr_id_branch_oid(token)
+        rebase_pr(pr_id, source_branch_oid, token)
+        _, source_current_revision = get_pr_id_branch_oid(token)
+        with open('$(results.source-current-revision.path)', "w") as f:
+          f.write(source_current_revision)

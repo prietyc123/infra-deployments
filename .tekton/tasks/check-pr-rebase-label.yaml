@@ -1,0 +1,70 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: pr-rebase-labels
+spec:
+  description: |
+    check the pull request for which the test is running on staging is needs rebase or not.
+  params:
+    - name: match_label
+    - name: pull_request_number
+    - name: TARGET_GH_OWNER
+      description: Owner of GitHub repository of the infra-deployments code
+      default: prietyc123
+    - name: TARGET_GH_REPO
+      description: GitHub repository of the infra-deployments code
+      default: infra-deployments
+  results:
+    - name: matched-rebase-label
+  workspaces:
+    - name: shared-file-path
+  steps:
+    - name: check-pr-rebase-label
+      image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
+      workingDir: $(workspaces.shared-file-path.path)
+      env:
+        - name: GITHUB_API_URL
+          value: https://api.github.com
+        - name: PULL_REQUEST_NUMBER
+          value: $(params.pull_request_number)
+        - name: TARGET_GH_OWNER
+          value: "$(params.TARGET_GH_OWNER)"
+        - name: TARGET_GH_REPO
+          value: "$(params.TARGET_GH_REPO)"
+      script: |
+        #!/usr/bin/env python3
+        import json
+        import os
+        import requests    
+        
+        def get_labels_name(token):
+          target_gh_owner = os.environ.get('TARGET_GH_OWNER')
+          target_gh_repo = os.environ.get('TARGET_GH_REPO')
+          pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
+          github_api_url = os.environ.get('GITHUB_API_URL')
+          req = requests.get(
+            f"{github_api_url}/repos/{target_gh_owner}/{target_gh_repo}/issues/{pull_request_number}",
+            headers={
+              "Authorization": f"Bearer {token}"
+            },
+            data=json.dumps({}))
+          response = req.json()
+          label_names = [label["name"] for label in response["labels"]]
+          return label_names
+
+        def check_label_exist(label_names):
+          if not label_names or "$(params.match_label)" not in label_names:
+            print("Label does not exists")
+            return False
+          else:
+            print("Label matched")
+            return True
+
+        current_dir = os.getcwd()
+        with open(f'{current_dir}/github-token.txt', 'r') as token_file:
+          token = token_file.read()
+
+        label_names = get_labels_name(token)
+        matched_label_status = check_label_exist(label_names)
+        with open('$(results.matched-rebase-label.path)', "w") as f:
+          f.write(str(matched_label_status))

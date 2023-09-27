@@ -1,0 +1,12 @@
+---
+monitoring:
+  - monitoring-workload-grafana
+  - monitoring-workload-prometheus
+pipeline-service:
+  - pipeline-service
+  # - pipeline-service-stone-stg-m01
+  # - pipeline-service-stone-stg-rh01
+build-service:
+  - build-service
+integration:
+  - integration
