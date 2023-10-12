@@ -8,7 +8,7 @@ commonAnnotations:
   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 
 resources:
-  - https://github.com/openshift-pipelines/pipeline-service.git/operator/gitops/argocd/pipeline-service?ref=436ec45eda013a5ff0e95c31c20796d4127484be
+  - https://github.com/openshift-pipelines/pipeline-service.git/operator/gitops/argocd/pipeline-service?ref=dce63caf4d6e90942dc1c369bc6ef555df97eaf1
   - pipelines-as-code-secret.yaml
   - ../../base/external-secrets
   - ../../base/testing
