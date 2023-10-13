@@ -11,15 +11,8 @@ spec:
     - name: sender
   workspaces:
     - name: git
-    - name: shared-workspace
     - name: shared-file
   tasks:
-    - name: staging-argocd-login
-      taskRef:
-        name: login-argocd
-      workspaces:
-        - name: output
-          workspace: shared-workspace
     - name: clone-infra-deployment-git
       taskRef:
         name: git-clone
@@ -84,6 +77,8 @@ spec:
           value: $(params.source_branch)
         - name: sender
           value: $(params.sender)
+        - name: pr_branch_revision
+          value: $(tasks.rebase-pr.results.source-current-revision)
       workspaces:
         - name: infra-deployment-git
           workspace: git
@@ -93,18 +88,17 @@ spec:
       runAfter:
         - changed-component-app-name
         - rebase-pr
-    - name: staging-argocd-app-sync
-      taskRef:
-        name: app-sync
-      workspaces:
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-        - name: shared-file-path
-          workspace: shared-file
-      runAfter:
-        - replace-revision
-        - staging-argocd-login
+    # - name: staging-argocd-app-sync
+    #   taskRef:
+    #     name: app-sync
+    #   workspaces:
+    #     - name: infra-deployment-git
+    #       workspace: git
+    #       subPath: infra-deployment-git
+    #     - name: shared-file-path
+    #       workspace: shared-file
+    #   runAfter:
+    #     - replace-revision
     - name: clone-stage-e2e-git
       taskRef:
         name: git-clone
@@ -131,50 +125,37 @@ spec:
         workspace: git
         subPath: stage-e2e-git
       runAfter:
-        - staging-argocd-app-sync
+        - replace-revision
         - clone-stage-e2e-git
   finally:
-    - name: rebase-pr-2
-      taskRef:
-        name: rebase-pr
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
-        - name: source_branch
-          value: $(params.source_branch)
-      workspaces:
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
+    # - name: rebase-pr-2
+    #   taskRef:
+    #     name: rebase-pr
+    #   params:
+    #     - name: pull_request_number
+    #       value: $(params.pull_request_number)
+    #     - name: source_branch
+    #       value: $(params.source_branch)
+    #   workspaces:
+    #     - name: infra-deployment-git
+    #       workspace: git
+    #       subPath: infra-deployment-git
     - name: revert-replace-revision
       taskRef:
         name: revert-replace-revision
-      params:
-        - name: source_branch
-          value: $(params.source_branch)
-      workspaces:
-        - name: argocd-config
-          workspace: shared-workspace
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-      when:
-        - input: $(tasks.rebase-pr-2.status)
-          operator: in
-          values: ["Succeeded"]
-    - name: staging-argocd-app-sync-2
-      taskRef:
-        name: app-sync
-      workspaces:
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-        - name: shared-file-path
-          workspace: shared-file
-      when:
-        - input: $(tasks.revert-replace-revision.status)
-          operator: in
-          values: ["Succeeded"]
+    # - name: staging-argocd-app-sync-2
+    #   taskRef:
+    #     name: app-sync
+    #   workspaces:
+    #     - name: infra-deployment-git
+    #       workspace: git
+    #       subPath: infra-deployment-git
+    #     - name: shared-file-path
+    #       workspace: shared-file
+    #   when:
+    #     - input: $(tasks.revert-replace-revision.status)
+    #       operator: in
+    #       values: ["Succeeded"]
     - name: rebase-pr-3
       taskRef:
         name: rebase-pr
@@ -187,10 +168,6 @@ spec:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
-      when:
-        - input: $(tasks.staging-argocd-app-sync-2.status)
-          operator: in
-          values: ["Succeeded"]
     - name: merge-pr
       taskRef:
         name: merge-pr
@@ -207,16 +184,16 @@ spec:
         - input: $(tasks.rebase-pr-3.status)
           operator: in
           values: ["Succeeded"]
-    - name: send-slack-notification
-      taskRef:
-        name: send-slack-notification
-      params:
-        - name: pr_id
-          value: $(tasks.get-pr-number.results.pr_id)
-        - name: MESSAGE
-          value: |
-            <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|View logs> <tag_ic>
-      when:
-        - input: $(params.SEND_SLACK_NOTIFICATION)
-          operator: in
-          values: ["true"]
+    # - name: send-slack-notification
+    #   taskRef:
+    #     name: send-slack-notification
+    #   params:
+    #     - name: pr_id
+    #       value: $(tasks.get-pr-number.results.pr_id)
+    #     - name: MESSAGE
+    #       value: |
+    #         <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|View logs> <tag_ic>
+    #   when:
+    #     - input: $(params.SEND_SLACK_NOTIFICATION)
+    #       operator: in
+    #       values: ["true"]
