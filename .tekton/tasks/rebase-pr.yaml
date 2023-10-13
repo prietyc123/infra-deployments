@@ -25,6 +25,8 @@ spec:
     - name: GITHUB_APP_INSTALLATION_ID
       description: Installation ID of Github app in the organization
       default: "33726981"
+  results:
+    - name: source-current-revision
   workspaces:
    - name: infra-deployment-git
   volumes:
@@ -211,5 +213,8 @@ spec:
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
             pr_id, source_branch_oid = github_app.get_pr_id_branch_oid()
             github_app.rebase_pr(pr_id, source_branch_oid)
+            _, source_current_revision = github_app.get_pr_id_branch_oid()
+            with open($(results.source-current-revision.path), "w") as f:
+              f.write(source_current_revision)
         if __name__ == '__main__':
             main()
