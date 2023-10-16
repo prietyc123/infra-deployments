@@ -144,10 +144,6 @@ spec:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
-      when:
-        - input: $(tasks.stage-verify-e2e-test.status)
-          operator: in
-          values: ["Succeeded"]
       runAfter:
         - stage-verify-e2e-test
     - name: merge-pr
@@ -164,11 +160,6 @@ spec:
           subPath: infra-deployment-git
       runAfter:
         - rebase-pr-3
-      when:
-        - input: $(tasks.stage-verify-e2e-test.status)
-          operator: in
-          values: ["Succeeded"]
-    
   # finally:
     # - name: rebase-pr-2
     #   taskRef:
