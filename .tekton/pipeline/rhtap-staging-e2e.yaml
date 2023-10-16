@@ -169,10 +169,6 @@ spec:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
-      when:
-        - input: $(tasks.staging-argocd-app-sync-2.status)
-          operator: in
-          values: ["Succeeded"]
     - name: merge-pr
       taskRef:
         name: merge-pr
