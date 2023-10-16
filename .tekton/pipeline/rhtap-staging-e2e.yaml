@@ -189,16 +189,16 @@ spec:
         - input: $(tasks.rebase-pr-3.status)
           operator: in
           values: ["Succeeded"]
-    - name: send-slack-notification
-      taskRef:
-        name: send-slack-notification
-      params:
-        - name: pr_id
-          value: $(tasks.get-pr-number.results.pr_id)
-        - name: MESSAGE
-          value: |
-            <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|View logs> <tag_ic>
-      when:
-        - input: $(params.SEND_SLACK_NOTIFICATION)
-          operator: in
-          values: ["true"]
+    # - name: send-slack-notification
+    #   taskRef:
+    #     name: send-slack-notification
+    #   params:
+    #     - name: pr_id
+    #       value: $(tasks.get-pr-number.results.pr_id)
+    #     - name: MESSAGE
+    #       value: |
+    #         <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|View logs> <tag_ic>
+    #   when:
+    #     - input: $(params.SEND_SLACK_NOTIFICATION)
+    #       operator: in
+    #       values: ["true"]
