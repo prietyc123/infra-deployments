@@ -127,7 +127,49 @@ spec:
       runAfter:
         - replace-revision
         - clone-stage-e2e-git
-  finally:
+    - name: revert-replace-revision
+      taskRef:
+        name: revert-replace-revision
+      runAfter:
+        - stage-verify-e2e-test
+    - name: rebase-pr-3
+      taskRef:
+        name: rebase-pr
+      params:
+        - name: pull_request_number
+          value: $(params.pull_request_number)
+        - name: source_branch
+          value: $(params.source_branch)
+      workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      when:
+        - input: $(tasks.stage-verify-e2e-test.status)
+          operator: in
+          values: ["Succeeded"]
+      runAfter:
+        - stage-verify-e2e-test
+    - name: merge-pr
+      taskRef:
+        name: merge-pr
+      params:
+        - name: pull_request_number
+          value: $(params.pull_request_number)
+        - name: source_branch
+          value: $(params.source_branch)
+      workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+      runAfter:
+        - rebase-pr-3
+      when:
+        - input: $(tasks.stage-verify-e2e-test.status)
+          operator: in
+          values: ["Succeeded"]
+    
+  # finally:
     # - name: rebase-pr-2
     #   taskRef:
     #     name: rebase-pr
@@ -140,9 +182,9 @@ spec:
     #     - name: infra-deployment-git
     #       workspace: git
     #       subPath: infra-deployment-git
-    - name: revert-replace-revision
-      taskRef:
-        name: revert-replace-revision
+    # - name: revert-replace-revision
+    #   taskRef:
+    #     name: revert-replace-revision
     # - name: staging-argocd-app-sync-2
     #   taskRef:
     #     name: app-sync
@@ -156,34 +198,34 @@ spec:
     #     - input: $(tasks.revert-replace-revision.status)
     #       operator: in
     #       values: ["Succeeded"]
-    - name: rebase-pr-3
-      taskRef:
-        name: rebase-pr
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
-        - name: source_branch
-          value: $(params.source_branch)
-      workspaces:
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-    - name: merge-pr
-      taskRef:
-        name: merge-pr
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
-        - name: source_branch
-          value: $(params.source_branch)
-      workspaces:
-        - name: infra-deployment-git
-          workspace: git
-          subPath: infra-deployment-git
-      when:
-        - input: $(tasks.rebase-pr-3.status)
-          operator: in
-          values: ["Succeeded"]
+    # - name: rebase-pr-3
+    #   taskRef:
+    #     name: rebase-pr
+    #   params:
+    #     - name: pull_request_number
+    #       value: $(params.pull_request_number)
+    #     - name: source_branch
+    #       value: $(params.source_branch)
+    #   workspaces:
+    #     - name: infra-deployment-git
+    #       workspace: git
+    #       subPath: infra-deployment-git
+    # - name: merge-pr
+    #   taskRef:
+    #     name: merge-pr
+    #   params:
+    #     - name: pull_request_number
+    #       value: $(params.pull_request_number)
+    #     - name: source_branch
+    #       value: $(params.source_branch)
+    #   workspaces:
+    #     - name: infra-deployment-git
+    #       workspace: git
+    #       subPath: infra-deployment-git
+    #   when:
+    #     - input: $(tasks.rebase-pr-3.status)
+    #       operator: in
+    #       values: ["Succeeded"]
     # - name: send-slack-notification
     #   taskRef:
     #     name: send-slack-notification
