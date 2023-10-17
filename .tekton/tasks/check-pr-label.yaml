@@ -158,9 +158,9 @@ spec:
             def check_label_exist(self, labels):
                 label_names = [label.get('name', '') for label in labels]
                 if not label_names or $(params.match_label) not in label_names:
-                  return false
+                  return False
                 else:
-                  return true
+                  return True
 
         def main():
             with open(os.environ['GITHUBAPP_KEY_PATH'], 'rb') as key_file:
@@ -175,8 +175,8 @@ spec:
                 app_id=app_id,
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
             labels = github_app.get_pr_id_labels()
-            matched-label-status = github_app.check_label_exist(labels)
+            matched_label_status = github_app.check_label_exist(labels)
             with open('$(results.matched-label.path)', "w") as f:
-              f.write(str(matched-label-status))
+              f.write(str(matched_label_status))
         if __name__ == '__main__':
             main()

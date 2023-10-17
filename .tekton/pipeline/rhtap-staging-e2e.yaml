@@ -37,7 +37,7 @@ spec:
       when:
         - input: $(tasks.check-merge-label.results.matched-label)
           operator: in
-          values: ["true"]
+          values: ["True"]
       workspaces:
       - name: output
         workspace: git
@@ -51,6 +51,10 @@ spec:
           value: $(params.revision)
       runAfter:
         - clone-infra-deployment-git
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       workspaces:
         - name: infra-deployment-git
           workspace: git
@@ -66,6 +70,10 @@ spec:
           subPath: infra-deployment-git
         - name: shared-file-path
           workspace: shared-file
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       runAfter:
         - get-pr-modified-files
     - name: check-rebase-label
@@ -78,6 +86,10 @@ spec:
           value: "needs-rebase"
       runAfter:
         - get-pr-modified-files
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
     - name: rebase-pr
       taskRef:
         name: rebase-pr
@@ -93,7 +105,10 @@ spec:
       when:
         - input: $(tasks.check-rebase-label.results.matched-label)
           operator: in
-          values: ["true"]
+          values: ["True"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       runAfter:
         - check-rebase-label
     - name: replace-revision
@@ -111,7 +126,10 @@ spec:
       when:
         - input: $(tasks.check-rebase-label.results.matched-label)
           operator: in
-          values: ["false"]
+          values: ["False"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       runAfter:
         - changed-component-app-name
         - check-rebase-label
@@ -130,7 +148,7 @@ spec:
       when:
         - input: $(tasks.check-merge-label.results.matched-label)
           operator: in
-          values: ["true"]
+          values: ["True"]
       workspaces:
       - name: output
         workspace: git
@@ -149,6 +167,10 @@ spec:
       runAfter:
         - replace-revision
         - clone-stage-e2e-git
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
     - name: check-rebase-label-2
       taskRef:
         name: pr-labels
@@ -159,6 +181,10 @@ spec:
           value: "needs-rebase"
       runAfter:
         - stage-verify-e2e-test
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
     - name: remove-merge-label
       taskRef:
         name: remove-pr-labels
@@ -168,9 +194,12 @@ spec:
         - name: pull_request_number
           value: $(params.pull_request_number)
       when:
-        - input: $(tasks.check-merge-label-2.results.matched-label)
+        - input: $(tasks.check-rebase-label-2.results.matched-label)
           operator: in
-          values: ["true"]
+          values: ["True"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       runAfter:
         - check-rebase-label-2
     - name: rebase-pr-3
@@ -187,10 +216,21 @@ spec:
           subPath: infra-deployment-git
       runAfter:
         - remove-merge-label
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
+        - input: $(tasks.check-rebase-label-2.results.matched-label)
+          operator: in
+          values: ["True"]
   finally:
     - name: revert-replace-revision
       taskRef:
         name: revert-replace-revision
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
     - name: merge-pr
       taskRef:
         name: merge-pr
@@ -207,3 +247,6 @@ spec:
         - input: $(tasks.stage-verify-e2e-test.status)
           operator: in
           values: ["Succeeded"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
