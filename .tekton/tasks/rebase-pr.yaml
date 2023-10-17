@@ -214,7 +214,7 @@ spec:
             pr_id, source_branch_oid = github_app.get_pr_id_branch_oid()
             github_app.rebase_pr(pr_id, source_branch_oid)
             _, source_current_revision = github_app.get_pr_id_branch_oid()
-            with open($(results.source-current-revision.path), "w") as f:
+            with open('$(results.source-current-revision.path)', "w") as f:
               f.write(source_current_revision)
         if __name__ == '__main__':
             main()
