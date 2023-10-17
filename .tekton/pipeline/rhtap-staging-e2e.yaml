@@ -63,6 +63,8 @@ spec:
           value: $(params.pull_request_number)
         - name: source_branch
           value: $(params.source_branch)
+        - name: REVISION
+          value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
           workspace: git
@@ -140,6 +142,8 @@ spec:
           value: $(params.pull_request_number)
         - name: source_branch
           value: $(params.source_branch)
+        - name: REVISION
+          value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
           workspace: git
@@ -154,6 +158,8 @@ spec:
           value: $(params.pull_request_number)
         - name: source_branch
           value: $(params.source_branch)
+        - name: REVISION
+          value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
           workspace: git
