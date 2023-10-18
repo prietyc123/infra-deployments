@@ -1,12 +1,13 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: rebase-pr
+  name: remove-pr-labels
 spec:
   description: |
-    rebase the pull request for which the test is running on staging.
+    check the pull request for which the test is running on staging is ready to merge or not.
   params:
     - name: pull_request_number
+    - name: match_label
     - name: TARGET_GH_OWNER
       description: Owner of GitHub repository of the infra-deployments code
       default: prietyc123
@@ -16,26 +17,20 @@ spec:
     - name: shared-secret
       default: infra-deployments-pr-creator
       description: secret in the namespace which contains private key for the GitHub App
-    - name: source_branch
     - name: GITHUB_APP_ID
       description: ID of Github app used for updating PR
       default: "288147"
     - name: GITHUB_APP_INSTALLATION_ID
       description: Installation ID of Github app in the organization
       default: "33726981"
-  results:
-    - name: source-current-revision
-  workspaces:
-   - name: infra-deployment-git
   volumes:
     - name: infra-deployments-pr-creator
       secret:
         # 'private-key' - private key for Github app
         secretName: $(params.shared-secret)
   steps:
-    - name: rebase-pull-request
+    - name: remove-pr-label
       image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
-      workingDir: $(workspaces.infra-deployment-git.path)
       volumeMounts:
         - name: infra-deployments-pr-creator
           mountPath: /secrets/deploy-key
@@ -52,8 +47,6 @@ spec:
           value: https://api.github.com/graphql
         - name: PULL_REQUEST_NUMBER
           value: $(params.pull_request_number)
-        - name: SOURCE_BRANCH
-          value: $(params.source_branch)
         - name: TARGET_GH_OWNER
           value: "$(params.TARGET_GH_OWNER)"
         - name: TARGET_GH_REPO
@@ -119,81 +112,42 @@ spec:
                                         url,
                                         headers=headers,
                                         data=json.dumps(data))
-            def run_query(self, query, variables, headers={}):
-                if self.token and 'Authorization' not in headers:
-                      headers.update({"Authorization": "Bearer " + self.token})
-                url = f"{GITHUB_GRAPHQL_API_URL}"
-                request = requests.post(url, json={'query': query, 'variables': variables}, headers=headers)
-                if request.status_code == 200:
-                    return request.json()
-                else:
-                    raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
 
-            def get_pr_id_branch_oid(self):
+            def get_labels(self):
                 target_gh_owner = os.environ.get('TARGET_GH_OWNER')
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
-                source_branch = os.environ.get('SOURCE_BRANCH')
-                get_pr_id_branch_oid_query_variables = {
-                  "owner": f"{target_gh_owner}",
-                  "repo": f"{target_gh_repo}",
-                  "pr_number": int(f"{pull_request_number}"),
-                  "source_branch_name": f"{source_branch}",
-                }
-                get_pr_id_branch_oid_query = """
-                query GetPullRequestIDs($owner:String!, $repo:String!, $pr_number:Int!, $source_branch_name:String!) {
-                  repository(owner:$owner, name:$repo) {
-                    pullRequest(number: $pr_number) {
-                      id
-                    }
-                    ref(qualifiedName: $source_branch_name) {
-                      target {
-                        oid
-                      }
-                    }
-                  }
-                }
-                """
-                result = self.run_query(
-                    get_pr_id_branch_oid_query,
-                    get_pr_id_branch_oid_query_variables,
+                req = self._request(
+                    "GET",
+                    f"/repos/{target_gh_owner}/{target_gh_repo}/issues/{pull_request_number}",
                     headers={
                         "Authorization": f"Bearer {self.token}"
                     })
-                pr_id = result["data"]["repository"]["pullRequest"]["id"]
-                source_branch_oid = result["data"]["repository"]["ref"]["target"]["oid"]
-                return pr_id, source_branch_oid
+                data = response.json()
+                labels_name = [label["name"] for label in data["labels"]]
+                return label_names
 
-            def rebase_pr(self, pr_id, source_branch_oid):
-                rebase_pr_varaibles = {
-                  "pullrequest_id": str(pr_id),
-                  "expectedHeadOid": source_branch_oid,
-                  "updateMethod" : 'REBASE',
-                }
+            def remove_label(self, label_names):
+                target_gh_owner = os.environ.get('TARGET_GH_OWNER')
+                target_gh_repo = os.environ.get('TARGET_GH_REPO')
+                pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
+                # Check if the label to remove exists on the pull request
+                if "$(params.match_label)" in label_names:
+                    # Remove the label
+                    label_names.remove("$(params.match_label)")
 
-                rebase_pr_mutation = """
-                mutation UpdatePullRequestBranch($pullrequest_id:ID!, $expectedHeadOid:GitObjectID, $updateMethod:PullRequestBranchUpdateMethod) {
-                  updatePullRequestBranch(input:{pullRequestId: $pullrequest_id, expectedHeadOid: $expectedHeadOid, updateMethod: $updateMethod}) {
-                    clientMutationId
-                    pullRequest {
-                      id
-                    }
-                  }
-                }
-                """
-
-                result = self.run_query(
-                    rebase_pr_mutation,
-                    rebase_pr_varaibles,
-                    headers={
-                        "Authorization": f"Bearer {self.token}"
-                    })
-                if "errors" in result.keys():
-                    for error in result["errors"]:
-                        print("ERROR: {0}".format(error["message"]))
-                else:
-                    print("SUCCESS: Rebased PR id {0}".format(result["data"]["updatePullRequestBranch"]["pullRequest"]["id"]))
-
+                    # Update the labels on the pull request
+                    req = self._request(
+                        "PATCH",
+                        f"/repos/{target_gh_owner}/{target_gh_repo}/issues/{pull_request_number}",
+                        headers={
+                            "Authorization": f"Bearer {self.token}"
+                        }),
+                        data={"labels": label_names}
+                    if req.status_code == 200:
+                      print("label $(params.match_label) has been removed successfully")
+                    else:
+                      raise Exception("Failed to remove the label from the pull request.")
 
         def main():
             with open(os.environ['GITHUBAPP_KEY_PATH'], 'rb') as key_file:
@@ -207,10 +161,7 @@ spec:
                 key,
                 app_id=app_id,
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
-            pr_id, source_branch_oid = github_app.get_pr_id_branch_oid()
-            github_app.rebase_pr(pr_id, source_branch_oid)
-            _, source_current_revision = github_app.get_pr_id_branch_oid()
-            with open('$(results.source-current-revision.path)', "w") as f:
-              f.write(source_current_revision)
+            label_names = github_app.get_labels()
+            github_app.remove_label(label_names)
         if __name__ == '__main__':
             main()
