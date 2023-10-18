@@ -1,11 +1,11 @@
 ---
 monitoring:
-  - monitoring-workload-grafana-in-cluster-local
+  - monitoring-workload-grafana
 pipeline-service:
-  - pipeline-service-in-cluster-local
+  - pipeline-service
   # - pipeline-service-stone-stg-m01
   # - pipeline-service-stone-stg-rh01
 build-service:
-  - build-service-in-cluster-local
+  - build-service
 integration:
-  - integration-in-cluster-local
+  - integration

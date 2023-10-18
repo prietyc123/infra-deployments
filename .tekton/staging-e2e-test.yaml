@@ -13,7 +13,9 @@ metadata:
     pipelinesascode.tekton.dev/task-4: "[.tekton/tasks/replace-revision.yaml]"
     pipelinesascode.tekton.dev/task-5: "[.tekton/tasks/revert-replace-revision.yaml]"
     pipelinesascode.tekton.dev/task-6: "[.tekton/tasks/merge-pr.yaml]"
-    pipelinesascode.tekton.dev/task-7: "[git-clone]"
+    pipelinesascode.tekton.dev/task-7: "[.tekton/tasks/check-pr-label.yaml]"
+    pipelinesascode.tekton.dev/task-8: "[.tekton/tasks/remove-pr-label.yaml]"
+    pipelinesascode.tekton.dev/task-9: "[git-clone]"
     pipelinesascode.tekton.dev/max-keep-runs: "10"
 spec:
   params:
@@ -23,8 +25,6 @@ spec:
       value: "{{ revision }}"
     - name: pull_request_number
       value: "{{ pull_request_number }}"
-    - name: sender
-      value: "{{ sender }}"
     - name: source_branch
       value: "{{ source_branch }}"
   pipelineRef:

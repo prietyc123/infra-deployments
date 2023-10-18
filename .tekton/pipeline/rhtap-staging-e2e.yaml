@@ -8,14 +8,22 @@ spec:
     - name: revision
     - name: pull_request_number
     - name: source_branch
-    - name: sender
   workspaces:
     - name: git
     - name: shared-file
   tasks:
+    - name: check-merge-label
+      taskRef:
+        name: pr-labels
+      params:
+        - name: pull_request_number
+          value: $(params.pull_request_number)
+        - name: match_label
+          value: "ok-to-merge"
     - name: clone-infra-deployment-git
       taskRef:
         name: git-clone
+        kind: ClusterRask
       params:
         - name: url
           value: $(params.repo_url)
@@ -25,11 +33,16 @@ spec:
           value: $(params.revision)
         - name: depth
           value: "3"
+      runAfter:
+        - check-merge-label
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       workspaces:
       - name: output
         workspace: git
         subPath: infra-deployment-git
-      timeout: 10m
     - name: get-pr-modified-files
       taskRef:
         name: get-pr-modified-files
@@ -38,6 +51,10 @@ spec:
           value: $(params.revision)
       runAfter:
         - clone-infra-deployment-git
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       workspaces:
         - name: infra-deployment-git
           workspace: git
@@ -53,8 +70,26 @@ spec:
           subPath: infra-deployment-git
         - name: shared-file-path
           workspace: shared-file
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       runAfter:
         - get-pr-modified-files
+    - name: check-rebase-label
+      taskRef:
+        name: pr-labels
+      params:
+        - name: pull_request_number
+          value: $(params.pull_request_number)
+        - name: match_label
+          value: "needs-rebase"
+      runAfter:
+        - get-pr-modified-files
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
     - name: rebase-pr
       taskRef:
         name: rebase-pr
@@ -63,22 +98,23 @@ spec:
           value: $(params.pull_request_number)
         - name: source_branch
           value: $(params.source_branch)
-        - name: REVISION
-          value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
+      when:
+        - input: $(tasks.check-rebase-label.results.matched-label)
+          operator: in
+          values: ["True"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       runAfter:
-        - get-pr-modified-files
+        - check-rebase-label
     - name: replace-revision
       taskRef:
         name: replace-revision
       params:
-        - name: source_branch
-          value: $(params.source_branch)
-        - name: sender
-          value: $(params.sender)
         - name: pr_branch_revision
           value: $(tasks.rebase-pr.results.source-current-revision)
       workspaces:
@@ -87,20 +123,16 @@ spec:
           subPath: infra-deployment-git
         - name: shared-file-path
           workspace: shared-file
+      when:
+        - input: $(tasks.check-rebase-label.results.matched-label)
+          operator: in
+          values: ["False"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       runAfter:
         - changed-component-app-name
-        - rebase-pr
-    # - name: staging-argocd-app-sync
-    #   taskRef:
-    #     name: app-sync
-    #   workspaces:
-    #     - name: infra-deployment-git
-    #       workspace: git
-    #       subPath: infra-deployment-git
-    #     - name: shared-file-path
-    #       workspace: shared-file
-    #   runAfter:
-    #     - replace-revision
+        - check-rebase-label
     - name: clone-stage-e2e-git
       taskRef:
         name: git-clone
@@ -111,11 +143,16 @@ spec:
           value: "true"
         - name: revision
           value: "verify-stage"
+      runAfter:
+        - check-merge-label
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
       workspaces:
       - name: output
         workspace: git
         subPath: stage-e2e-git
-      timeout: 10m
     - name: stage-verify-e2e-test
       taskRef:
         name: stage-verify-e2e-test
@@ -129,11 +166,41 @@ spec:
       runAfter:
         - replace-revision
         - clone-stage-e2e-git
-    - name: revert-replace-revision
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
+    - name: check-rebase-label-2
       taskRef:
-        name: revert-replace-revision
+        name: pr-labels
+      params:
+        - name: pull_request_number
+          value: $(params.pull_request_number)
+        - name: match_label
+          value: "needs-rebase"
       runAfter:
         - stage-verify-e2e-test
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
+    - name: remove-merge-label
+      taskRef:
+        name: remove-pr-labels
+      params:
+        - name: match_label
+          value: "ok-to-merge"
+        - name: pull_request_number
+          value: $(params.pull_request_number)
+      when:
+        - input: $(tasks.check-rebase-label-2.results.matched-label)
+          operator: in
+          values: ["True"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
+      runAfter:
+        - check-rebase-label-2
     - name: rebase-pr-3
       taskRef:
         name: rebase-pr
@@ -142,14 +209,27 @@ spec:
           value: $(params.pull_request_number)
         - name: source_branch
           value: $(params.source_branch)
-        - name: REVISION
-          value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
       runAfter:
-        - stage-verify-e2e-test
+        - remove-merge-label
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
+        - input: $(tasks.check-rebase-label-2.results.matched-label)
+          operator: in
+          values: ["True"]
+  finally:
+    - name: revert-replace-revision
+      taskRef:
+        name: revert-replace-revision
+      when:
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
     - name: merge-pr
       taskRef:
         name: merge-pr
@@ -158,81 +238,14 @@ spec:
           value: $(params.pull_request_number)
         - name: source_branch
           value: $(params.source_branch)
-        - name: REVISION
-          value: $(params.revision)
       workspaces:
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
-      runAfter:
-        - rebase-pr-3
-  # finally:
-    # - name: rebase-pr-2
-    #   taskRef:
-    #     name: rebase-pr
-    #   params:
-    #     - name: pull_request_number
-    #       value: $(params.pull_request_number)
-    #     - name: source_branch
-    #       value: $(params.source_branch)
-    #   workspaces:
-    #     - name: infra-deployment-git
-    #       workspace: git
-    #       subPath: infra-deployment-git
-    # - name: revert-replace-revision
-    #   taskRef:
-    #     name: revert-replace-revision
-    # - name: staging-argocd-app-sync-2
-    #   taskRef:
-    #     name: app-sync
-    #   workspaces:
-    #     - name: infra-deployment-git
-    #       workspace: git
-    #       subPath: infra-deployment-git
-    #     - name: shared-file-path
-    #       workspace: shared-file
-    #   when:
-    #     - input: $(tasks.revert-replace-revision.status)
-    #       operator: in
-    #       values: ["Succeeded"]
-    # - name: rebase-pr-3
-    #   taskRef:
-    #     name: rebase-pr
-    #   params:
-    #     - name: pull_request_number
-    #       value: $(params.pull_request_number)
-    #     - name: source_branch
-    #       value: $(params.source_branch)
-    #   workspaces:
-    #     - name: infra-deployment-git
-    #       workspace: git
-    #       subPath: infra-deployment-git
-    # - name: merge-pr
-    #   taskRef:
-    #     name: merge-pr
-    #   params:
-    #     - name: pull_request_number
-    #       value: $(params.pull_request_number)
-    #     - name: source_branch
-    #       value: $(params.source_branch)
-    #   workspaces:
-    #     - name: infra-deployment-git
-    #       workspace: git
-    #       subPath: infra-deployment-git
-    #   when:
-    #     - input: $(tasks.rebase-pr-3.status)
-    #       operator: in
-    #       values: ["Succeeded"]
-    # - name: send-slack-notification
-    #   taskRef:
-    #     name: send-slack-notification
-    #   params:
-    #     - name: pr_id
-    #       value: $(tasks.get-pr-number.results.pr_id)
-    #     - name: MESSAGE
-    #       value: |
-    #         <icon> Staging e2e pipeline run <pr_name> *<run_status>* for pull request <<pr_url>|pr> <icon> <<logs_url>|View logs> <tag_ic>
-    #   when:
-    #     - input: $(params.SEND_SLACK_NOTIFICATION)
-    #       operator: in
-    #       values: ["true"]
+      when:
+        - input: $(tasks.stage-verify-e2e-test.status)
+          operator: in
+          values: ["Succeeded"]
+        - input: $(tasks.check-merge-label.results.matched-label)
+          operator: in
+          values: ["True"]
