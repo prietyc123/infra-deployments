@@ -7,8 +7,6 @@ spec:
     merge the pull request into main branch.
   params:
     - name: pull_request_number
-    - name: REVISION
-      description: Git reference which was built by the Pipeline
     - name: TARGET_GH_OWNER
       description: Owner of GitHub repository of the infra-deployments code
       default: prietyc123
@@ -52,8 +50,6 @@ spec:
           value: https://api.github.com/graphql
         - name: PULL_REQUEST_NUMBER
           value: $(params.pull_request_number)
-        - name: REVISION
-          value: $(params.REVISION)
         - name: SOURCE_BRANCH
           value: $(params.source_branch)
         - name: TARGET_GH_OWNER
