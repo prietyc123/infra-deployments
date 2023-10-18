@@ -1,12 +1,13 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: rebase-pr
+  name: pr-labels
 spec:
   description: |
-    rebase the pull request for which the test is running on staging.
+    check the pull request for which the test is running on staging is ready to merge or not.
   params:
     - name: pull_request_number
+    - name: match_label
     - name: TARGET_GH_OWNER
       description: Owner of GitHub repository of the infra-deployments code
       default: prietyc123
@@ -16,7 +17,6 @@ spec:
     - name: shared-secret
       default: infra-deployments-pr-creator
       description: secret in the namespace which contains private key for the GitHub App
-    - name: source_branch
     - name: GITHUB_APP_ID
       description: ID of Github app used for updating PR
       default: "288147"
@@ -24,18 +24,15 @@ spec:
       description: Installation ID of Github app in the organization
       default: "33726981"
   results:
-    - name: source-current-revision
-  workspaces:
-   - name: infra-deployment-git
+    - name: matched-label
   volumes:
     - name: infra-deployments-pr-creator
       secret:
         # 'private-key' - private key for Github app
         secretName: $(params.shared-secret)
   steps:
-    - name: rebase-pull-request
+    - name: check-pr-label
       image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
-      workingDir: $(workspaces.infra-deployment-git.path)
       volumeMounts:
         - name: infra-deployments-pr-creator
           mountPath: /secrets/deploy-key
@@ -52,8 +49,6 @@ spec:
           value: https://api.github.com/graphql
         - name: PULL_REQUEST_NUMBER
           value: $(params.pull_request_number)
-        - name: SOURCE_BRANCH
-          value: $(params.source_branch)
         - name: TARGET_GH_OWNER
           value: "$(params.TARGET_GH_OWNER)"
         - name: TARGET_GH_REPO
@@ -129,71 +124,43 @@ spec:
                 else:
                     raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
 
-            def get_pr_id_branch_oid(self):
+            def get_pr_id_labels(self):
                 target_gh_owner = os.environ.get('TARGET_GH_OWNER')
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
-                source_branch = os.environ.get('SOURCE_BRANCH')
-                get_pr_id_branch_oid_query_variables = {
+                get_pr_id_labels_query_variables = {
                   "owner": f"{target_gh_owner}",
                   "repo": f"{target_gh_repo}",
                   "pr_number": int(f"{pull_request_number}"),
-                  "source_branch_name": f"{source_branch}",
                 }
-                get_pr_id_branch_oid_query = """
-                query GetPullRequestIDs($owner:String!, $repo:String!, $pr_number:Int!, $source_branch_name:String!) {
+                get_pr_id_labels_query = """
+                query GetPullRequestIDs($owner:String!, $repo:String!, $pr_number:Int!) {
                   repository(owner:$owner, name:$repo) {
                     pullRequest(number: $pr_number) {
-                      id
-                    }
-                    ref(qualifiedName: $source_branch_name) {
-                      target {
-                        oid
+                      labels(first: 100) {
+                        nodes {
+                          name
+                        }
                       }
                     }
                   }
                 }
                 """
                 result = self.run_query(
-                    get_pr_id_branch_oid_query,
-                    get_pr_id_branch_oid_query_variables,
+                    get_pr_id_labels_query,
+                    get_pr_id_labels_query_variables,
                     headers={
                         "Authorization": f"Bearer {self.token}"
                     })
-                pr_id = result["data"]["repository"]["pullRequest"]["id"]
-                source_branch_oid = result["data"]["repository"]["ref"]["target"]["oid"]
-                return pr_id, source_branch_oid
+                labels = result["data"]["repository"]["pullRequest"]["labels"]["nodes"]
+                return labels
 
-            def rebase_pr(self, pr_id, source_branch_oid):
-                rebase_pr_varaibles = {
-                  "pullrequest_id": str(pr_id),
-                  "expectedHeadOid": source_branch_oid,
-                  "updateMethod" : 'REBASE',
-                }
-
-                rebase_pr_mutation = """
-                mutation UpdatePullRequestBranch($pullrequest_id:ID!, $expectedHeadOid:GitObjectID, $updateMethod:PullRequestBranchUpdateMethod) {
-                  updatePullRequestBranch(input:{pullRequestId: $pullrequest_id, expectedHeadOid: $expectedHeadOid, updateMethod: $updateMethod}) {
-                    clientMutationId
-                    pullRequest {
-                      id
-                    }
-                  }
-                }
-                """
-
-                result = self.run_query(
-                    rebase_pr_mutation,
-                    rebase_pr_varaibles,
-                    headers={
-                        "Authorization": f"Bearer {self.token}"
-                    })
-                if "errors" in result.keys():
-                    for error in result["errors"]:
-                        print("ERROR: {0}".format(error["message"]))
+            def check_label_exist(self, labels):
+                label_names = [label.get('name', '') for label in labels]
+                if not label_names or $(params.match_label) not in label_names:
+                  return False
                 else:
-                    print("SUCCESS: Rebased PR id {0}".format(result["data"]["updatePullRequestBranch"]["pullRequest"]["id"]))
-
+                  return True
 
         def main():
             with open(os.environ['GITHUBAPP_KEY_PATH'], 'rb') as key_file:
@@ -207,10 +174,9 @@ spec:
                 key,
                 app_id=app_id,
                 installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
-            pr_id, source_branch_oid = github_app.get_pr_id_branch_oid()
-            github_app.rebase_pr(pr_id, source_branch_oid)
-            _, source_current_revision = github_app.get_pr_id_branch_oid()
-            with open('$(results.source-current-revision.path)', "w") as f:
-              f.write(source_current_revision)
+            labels = github_app.get_pr_id_labels()
+            matched_label_status = github_app.check_label_exist(labels)
+            with open('$(results.matched-label.path)', "w") as f:
+              f.write(str(matched_label_status))
         if __name__ == '__main__':
             main()
