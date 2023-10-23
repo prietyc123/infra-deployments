@@ -4,7 +4,7 @@ metadata:
   name: remove-pr-labels
 spec:
   description: |
-    check the pull request for which the test is running on staging is ready to merge or not.
+    remove labels from the the pull request for which the test is running on staging.
   params:
     - name: pull_request_number
     - name: match_label
@@ -14,37 +14,15 @@ spec:
     - name: TARGET_GH_REPO
       description: GitHub repository of the infra-deployments code
       default: infra-deployments
-    - name: shared-secret
-      default: infra-deployments-pr-creator
-      description: secret in the namespace which contains private key for the GitHub App
-    - name: GITHUB_APP_ID
-      description: ID of Github app used for updating PR
-      default: "288147"
-    - name: GITHUB_APP_INSTALLATION_ID
-      description: Installation ID of Github app in the organization
-      default: "33726981"
-  volumes:
-    - name: infra-deployments-pr-creator
-      secret:
-        # 'private-key' - private key for Github app
-        secretName: $(params.shared-secret)
+  workspaces:
+   - name: shared-file-path
   steps:
     - name: remove-pr-label
       image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
-      volumeMounts:
-        - name: infra-deployments-pr-creator
-          mountPath: /secrets/deploy-key
+      workingDir: $(workspaces.shared-file-path.path)
       env:
-        - name: GITHUBAPP_KEY_PATH
-          value: /secrets/deploy-key/private-key
-        - name: GITHUBAPP_APP_ID
-          value: "$(params.GITHUB_APP_ID)"
-        - name: GITHUBAPP_INSTALLATION_ID
-          value: "$(params.GITHUB_APP_INSTALLATION_ID)"
         - name: GITHUB_API_URL
           value: https://api.github.com
-        - name: GITHUB_GRAPHQL_API_URL
-          value: https://api.github.com/graphql
         - name: PULL_REQUEST_NUMBER
           value: $(params.pull_request_number)
         - name: TARGET_GH_OWNER
@@ -55,57 +33,11 @@ spec:
         #!/usr/bin/env python3
         import json
         import os
-        import time
-        import base64
-        import subprocess
         import requests
-        from jwcrypto import jwk, jwt
-        EXPIRE_MINUTES_AS_SECONDS = int(os.environ.get('GITHUBAPP_TOKEN_EXPIRATION_MINUTES', 10)) * 60
-        # TODO support github enterprise
+
         GITHUB_API_URL = os.environ.get('GITHUB_API_URL')
-        GITHUB_GRAPHQL_API_URL = os.environ.get('GITHUB_GRAPHQL_API_URL')
-        class GitHub():
-            token = None
-            def __init__(self, private_key, app_id=None, installation_id=None):
-                if not isinstance(private_key, bytes):
-                    raise ValueError(f'"{private_key}" parameter must be byte-string')
-                self._private_key = private_key
-                self.app_id = app_id
-                self.token = self._get_token(installation_id)
-            def _load_private_key(self, pem_key_bytes):
-                return jwk.JWK.from_pem(pem_key_bytes)
-            def _app_token(self, expire_in=EXPIRE_MINUTES_AS_SECONDS):
-                key = self._load_private_key(self._private_key)
-                now = int(time.time())
-                token = jwt.JWT(
-                    header={"alg": "RS256"},
-                    claims={
-                        "iat": now,
-                        "exp": now + expire_in,
-                        "iss": self.app_id
-                    },
-                    algs=["RS256"],
-                )
-                token.make_signed_token(key)
-                return token.serialize()
-            def _get_token(self, installation_id=None):
-                app_token = self._app_token()
-                if not installation_id:
-                    return app_token
-                req = self._request(
-                    "POST",
-                    f"/app/installations/{installation_id}/access_tokens",
-                    headers={
-                        "Authorization": f"Bearer {app_token}",
-                        "Accept": "application/vnd.github.machine-man-preview+json"
-                    })
-                ret = req.json()
-                if 'token' not in ret:
-                    raise Exception(f"Authentication errors: {ret}")
-                return ret['token']
-            def _request(self, method, url, headers={}, data={}):
-                if self.token and 'Authorization' not in headers:
-                    headers.update({"Authorization": "Bearer " + self.token})
+
+        def _request(method, url, headers={}, data={}):
                 if not url.startswith("http"):
                     url = f"{GITHUB_API_URL}{url}"
                 return requests.request(method,
@@ -113,21 +45,21 @@ spec:
                                         headers=headers,
                                         data=json.dumps(data))
 
-            def get_labels(self):
+        def get_labels(token):
                 target_gh_owner = os.environ.get('TARGET_GH_OWNER')
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
-                req = self._request(
+                req = _request(
                     "GET",
                     f"/repos/{target_gh_owner}/{target_gh_repo}/issues/{pull_request_number}",
                     headers={
-                        "Authorization": f"Bearer {self.token}"
+                        "Authorization": f"Bearer {token}"
                     })
                 data = response.json()
                 labels_name = [label["name"] for label in data["labels"]]
                 return label_names
 
-            def remove_label(self, label_names):
+        def remove_label(label_names, token):
                 target_gh_owner = os.environ.get('TARGET_GH_OWNER')
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
@@ -137,11 +69,11 @@ spec:
                     label_names.remove("$(params.match_label)")
 
                     # Update the labels on the pull request
-                    req = self._request(
+                    req = _request(
                         "PATCH",
                         f"/repos/{target_gh_owner}/{target_gh_repo}/issues/{pull_request_number}",
                         headers={
-                            "Authorization": f"Bearer {self.token}"
+                            "Authorization": f"Bearer {token}"
                         }),
                         data={"labels": label_names}
                     if req.status_code == 200:
@@ -149,19 +81,8 @@ spec:
                     else:
                       raise Exception("Failed to remove the label from the pull request.")
 
-        def main():
-            with open(os.environ['GITHUBAPP_KEY_PATH'], 'rb') as key_file:
-                key = key_file.read()
-            if os.environ.get('GITHUBAPP_APP_ID'):
-                app_id = os.environ['GITHUBAPP_APP_ID']
-            else:
-                raise Exception("application id is not set")
-            print(f"Getting user token for application_id: {app_id}")
-            github_app = GitHub(
-                key,
-                app_id=app_id,
-                installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
-            label_names = github_app.get_labels()
-            github_app.remove_label(label_names)
-        if __name__ == '__main__':
-            main()
+        current_dir = os.getcwd()
+        with open(f'{current_dir}/github-token.txt', 'r') as token_file:
+          token = token_file.read()
+        label_names = get_labels(token)
+        remove_label(label_names, token)

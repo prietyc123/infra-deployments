@@ -1,10 +1,10 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: pr-labels
+  name: pr-rebase-labels
 spec:
   description: |
-    check the pull request for which the test is running on staging is ready to merge or not.
+    check the pull request for which the test is running on staging is needs rebase or not.
   params:
     - name: match_label
     - name: pull_request_number
@@ -15,11 +15,11 @@ spec:
       description: GitHub repository of the infra-deployments code
       default: infra-deployments
   results:
-    - name: matched-merge-label
+    - name: matched-rebase-label
   workspaces:
     - name: shared-file-path
   steps:
-    - name: check-pr-label
+    - name: check-pr-rebase-label
       image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
       workingDir: $(workspaces.shared-file-path.path)
       env:
@@ -66,5 +66,5 @@ spec:
 
         label_names = get_labels_name(token)
         matched_label_status = check_label_exist(label_names)
-        with open('$(results.matched-merge-label.path)', "w") as f:
+        with open('$(results.matched-rebase-label.path)', "w") as f:
           f.write(str(matched_label_status))
