@@ -13,41 +13,16 @@ spec:
     - name: TARGET_GH_REPO
       description: GitHub repository of the infra-deployments code
       default: infra-deployments
-    - name: shared-secret
-      default: infra-deployments-pr-creator
-      description: secret in the namespace which contains private key for the GitHub App
     - name: source_branch
-    - name: GITHUB_APP_ID
-      description: ID of Github app used for updating PR
-      default: "288147"
-    - name: GITHUB_APP_INSTALLATION_ID
-      description: Installation ID of Github app in the organization
-      default: "33726981"
   results:
     - name: source-current-revision
   workspaces:
-   - name: infra-deployment-git
-  volumes:
-    - name: infra-deployments-pr-creator
-      secret:
-        # 'private-key' - private key for Github app
-        secretName: $(params.shared-secret)
+   - name: shared-file-path
   steps:
     - name: rebase-pull-request
       image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
-      workingDir: $(workspaces.infra-deployment-git.path)
-      volumeMounts:
-        - name: infra-deployments-pr-creator
-          mountPath: /secrets/deploy-key
+      workingDir: $(workspaces.shared-file-path.path)
       env:
-        - name: GITHUBAPP_KEY_PATH
-          value: /secrets/deploy-key/private-key
-        - name: GITHUBAPP_APP_ID
-          value: "$(params.GITHUB_APP_ID)"
-        - name: GITHUBAPP_INSTALLATION_ID
-          value: "$(params.GITHUB_APP_INSTALLATION_ID)"
-        - name: GITHUB_API_URL
-          value: https://api.github.com
         - name: GITHUB_GRAPHQL_API_URL
           value: https://api.github.com/graphql
         - name: PULL_REQUEST_NUMBER
@@ -62,66 +37,11 @@ spec:
         #!/usr/bin/env python3
         import json
         import os
-        import time
-        import base64
-        import subprocess
         import requests
-        from jwcrypto import jwk, jwt
-        EXPIRE_MINUTES_AS_SECONDS = int(os.environ.get('GITHUBAPP_TOKEN_EXPIRATION_MINUTES', 10)) * 60
-        # TODO support github enterprise
-        GITHUB_API_URL = os.environ.get('GITHUB_API_URL')
+        
         GITHUB_GRAPHQL_API_URL = os.environ.get('GITHUB_GRAPHQL_API_URL')
-        class GitHub():
-            token = None
-            def __init__(self, private_key, app_id=None, installation_id=None):
-                if not isinstance(private_key, bytes):
-                    raise ValueError(f'"{private_key}" parameter must be byte-string')
-                self._private_key = private_key
-                self.app_id = app_id
-                self.token = self._get_token(installation_id)
-            def _load_private_key(self, pem_key_bytes):
-                return jwk.JWK.from_pem(pem_key_bytes)
-            def _app_token(self, expire_in=EXPIRE_MINUTES_AS_SECONDS):
-                key = self._load_private_key(self._private_key)
-                now = int(time.time())
-                token = jwt.JWT(
-                    header={"alg": "RS256"},
-                    claims={
-                        "iat": now,
-                        "exp": now + expire_in,
-                        "iss": self.app_id
-                    },
-                    algs=["RS256"],
-                )
-                token.make_signed_token(key)
-                return token.serialize()
-            def _get_token(self, installation_id=None):
-                app_token = self._app_token()
-                if not installation_id:
-                    return app_token
-                req = self._request(
-                    "POST",
-                    f"/app/installations/{installation_id}/access_tokens",
-                    headers={
-                        "Authorization": f"Bearer {app_token}",
-                        "Accept": "application/vnd.github.machine-man-preview+json"
-                    })
-                ret = req.json()
-                if 'token' not in ret:
-                    raise Exception(f"Authentication errors: {ret}")
-                return ret['token']
-            def _request(self, method, url, headers={}, data={}):
-                if self.token and 'Authorization' not in headers:
-                    headers.update({"Authorization": "Bearer " + self.token})
-                if not url.startswith("http"):
-                    url = f"{GITHUB_API_URL}{url}"
-                return requests.request(method,
-                                        url,
-                                        headers=headers,
-                                        data=json.dumps(data))
-            def run_query(self, query, variables, headers={}):
-                if self.token and 'Authorization' not in headers:
-                      headers.update({"Authorization": "Bearer " + self.token})
+        
+        def run_query(query, variables, headers={}):
                 url = f"{GITHUB_GRAPHQL_API_URL}"
                 request = requests.post(url, json={'query': query, 'variables': variables}, headers=headers)
                 if request.status_code == 200:
@@ -129,7 +49,7 @@ spec:
                 else:
                     raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
 
-            def get_pr_id_branch_oid(self):
+        def get_pr_id_branch_oid(token):
                 target_gh_owner = os.environ.get('TARGET_GH_OWNER')
                 target_gh_repo = os.environ.get('TARGET_GH_REPO')
                 pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
@@ -154,17 +74,17 @@ spec:
                   }
                 }
                 """
-                result = self.run_query(
+                result = run_query(
                     get_pr_id_branch_oid_query,
                     get_pr_id_branch_oid_query_variables,
                     headers={
-                        "Authorization": f"Bearer {self.token}"
+                        "Authorization": f"Bearer {token}"
                     })
                 pr_id = result["data"]["repository"]["pullRequest"]["id"]
                 source_branch_oid = result["data"]["repository"]["ref"]["target"]["oid"]
                 return pr_id, source_branch_oid
 
-            def rebase_pr(self, pr_id, source_branch_oid):
+        def rebase_pr(pr_id, source_branch_oid, token):
                 rebase_pr_varaibles = {
                   "pullrequest_id": str(pr_id),
                   "expectedHeadOid": source_branch_oid,
@@ -182,11 +102,11 @@ spec:
                 }
                 """
 
-                result = self.run_query(
+                result = run_query(
                     rebase_pr_mutation,
                     rebase_pr_varaibles,
                     headers={
-                        "Authorization": f"Bearer {self.token}"
+                        "Authorization": f"Bearer {token}"
                     })
                 if "errors" in result.keys():
                     for error in result["errors"]:
@@ -194,23 +114,11 @@ spec:
                 else:
                     print("SUCCESS: Rebased PR id {0}".format(result["data"]["updatePullRequestBranch"]["pullRequest"]["id"]))
 
-
-        def main():
-            with open(os.environ['GITHUBAPP_KEY_PATH'], 'rb') as key_file:
-                key = key_file.read()
-            if os.environ.get('GITHUBAPP_APP_ID'):
-                app_id = os.environ['GITHUBAPP_APP_ID']
-            else:
-                raise Exception("application id is not set")
-            print(f"Getting user token for application_id: {app_id}")
-            github_app = GitHub(
-                key,
-                app_id=app_id,
-                installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
-            pr_id, source_branch_oid = github_app.get_pr_id_branch_oid()
-            github_app.rebase_pr(pr_id, source_branch_oid)
-            _, source_current_revision = github_app.get_pr_id_branch_oid()
-            with open('$(results.source-current-revision.path)', "w") as f:
-              f.write(source_current_revision)
-        if __name__ == '__main__':
-            main()
+        current_dir = os.getcwd()
+        with open(f'{current_dir}/github-token.txt', 'r') as token_file:
+          token = token_file.read()
+        pr_id, source_branch_oid = get_pr_id_branch_oid(token)
+        rebase_pr(pr_id, source_branch_oid, token)
+        _, source_current_revision = get_pr_id_branch_oid(token)
+        with open('$(results.source-current-revision.path)', "w") as f:
+          f.write(source_current_revision)

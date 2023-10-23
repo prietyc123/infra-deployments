@@ -7,7 +7,7 @@ spec:
     revert the target revision to changed application in the pull request for rhtap stage testing.
   steps:
     - name: revert-revision
-      image: quay.io/openshift-pipeline/ci
+      image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
       script: |
         #!/usr/bin/env sh
         set -o errexit

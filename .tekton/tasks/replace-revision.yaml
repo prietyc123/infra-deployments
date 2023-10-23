@@ -11,7 +11,7 @@ spec:
    - name: shared-file-path
   steps:
     - name: replace-target-revision
-      image: quay.io/openshift-pipeline/ci
+      image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
       workingDir: $(workspaces.shared-file-path.path)
       script: |
         #!/usr/bin/env sh

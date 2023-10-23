@@ -14,7 +14,7 @@ spec:
    - name: shared-file-path
   steps:
     - name: get-component-app-name
-      image: quay.io/openshift-pipeline/ci
+      image: image-registry.openshift-image-registry.svc:5000/openshift/python:3.8
       workingDir: $(workspaces.infra-deployment-git.path)
       env:
         - name: APP_FILE_NAME

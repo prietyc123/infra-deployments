@@ -1,6 +1,7 @@
 ---
 monitoring:
   - monitoring-workload-grafana
+  - monitoring-workload-prometheus
 pipeline-service:
   - pipeline-service
   # - pipeline-service-stone-stg-m01

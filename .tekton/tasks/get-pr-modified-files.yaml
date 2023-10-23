@@ -6,20 +6,54 @@ spec:
   description: >-
     This task is for getting all the filepath changed for pull request
   params:
-    - name: revision
+    - name: pull_request_number
+    - name: TARGET_GH_OWNER
+      description: Owner of GitHub repository of the infra-deployments code
+      default: prietyc123
+    - name: TARGET_GH_REPO
+      description: GitHub repository of the infra-deployments code
+      default: infra-deployments
   workspaces:
-   - name: infra-deployment-git
    - name: shared-file-path
   steps:
     - name: get-merged-pr-files-changed
-      image: quay.io/openshift-pipeline/ci
-      workingDir: $(workspaces.infra-deployment-git.path)
+      image: quay.io/redhat-appstudio/github-app-token@sha256:b4f2af12e9beea68055995ccdbdb86cfe1be97688c618117e5da2243dc1da18e
+      workingDir: $(workspaces.shared-file-path.path)
+      env:
+        - name: GITHUB_API_URL
+          value: https://api.github.com
+        - name: PULL_REQUEST_NUMBER
+          value: $(params.pull_request_number)
+        - name: TARGET_GH_OWNER
+          value: "$(params.TARGET_GH_OWNER)"
+        - name: TARGET_GH_REPO
+          value: "$(params.TARGET_GH_REPO)"
       script: |
-        #!/usr/bin/env sh
-        set -o errexit
-        set -o nounset
-        set -o pipefail
-        git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
-        git diff --name-only $(params.revision)^ $(params.revision) > $(workspaces.shared-file-path.path)/updated_files.txt
-        echo "Updated files:"
-        cat "$(workspaces.shared-file-path.path)/updated_files.txt"
+        #!/usr/bin/env python3
+        import json
+        import os
+        import requests    
+        
+        def get_pr_files(token):
+          target_gh_owner = os.environ.get('TARGET_GH_OWNER')
+          target_gh_repo = os.environ.get('TARGET_GH_REPO')
+          pull_request_number = os.environ.get('PULL_REQUEST_NUMBER')
+          github_api_url = os.environ.get('GITHUB_API_URL')
+          req = requests.get(
+            f"{github_api_url}/repos/{target_gh_owner}/{target_gh_repo}/pulls/{pull_request_number}/files",
+            headers={
+              "Authorization": f"Bearer {token}"
+            })
+          pull_request_files = req.json()
+          file_names = [file["filename"] for file in pull_request_files]
+          return file_names
+
+        current_dir = os.getcwd()
+        with open(f'{current_dir}/github-token.txt', 'r') as token_file:
+          token = token_file.read()
+
+        file_names = get_pr_files(token)
+        with open(f'{current_dir}/updated_files.txt', "a") as f:
+          for filename in file_names:
+            f.write(filename + "\n")
+            print(filename)

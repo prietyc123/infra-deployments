@@ -15,7 +15,9 @@ metadata:
     pipelinesascode.tekton.dev/task-6: "[.tekton/tasks/merge-pr.yaml]"
     pipelinesascode.tekton.dev/task-7: "[.tekton/tasks/check-pr-label.yaml]"
     pipelinesascode.tekton.dev/task-8: "[.tekton/tasks/remove-pr-label.yaml]"
-    pipelinesascode.tekton.dev/task-9: "[git-clone]"
+    pipelinesascode.tekton.dev/task-9: "[.tekton/tasks/get-git-token.yaml]"
+    pipelinesascode.tekton.dev/task-10: "[.tekton/tasks/check-pr-rebase-label.yaml]"
+    pipelinesascode.tekton.dev/task-11: "[git-clone]"
     pipelinesascode.tekton.dev/max-keep-runs: "10"
 spec:
   params:
