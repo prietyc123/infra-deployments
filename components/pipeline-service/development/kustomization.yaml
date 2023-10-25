@@ -8,8 +8,8 @@ commonAnnotations:
   argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 
 resources:
-  - https://github.com/openshift-pipelines/pipeline-service.git/developer/openshift/gitops/argocd/pipeline-service?ref=1f13ca5c4851190effa9660d55fbc20d459d7762
-  - https://github.com/openshift-pipelines/pipeline-service.git/developer/openshift/gitops/argocd/pipeline-service-storage?ref=1f13ca5c4851190effa9660d55fbc20d459d7762
+  - https://github.com/openshift-pipelines/pipeline-service.git/developer/openshift/gitops/argocd/pipeline-service?ref=9bfc5b35d3c6a1b681f7a4ce30e89da06e586a2b
+  - https://github.com/openshift-pipelines/pipeline-service.git/developer/openshift/gitops/argocd/pipeline-service-storage?ref=9bfc5b35d3c6a1b681f7a4ce30e89da06e586a2b
   - ../base/rbac
   
 patches:
