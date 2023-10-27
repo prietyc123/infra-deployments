@@ -88,6 +88,7 @@ spec:
                 return token.serialize()
             def _get_token(self, installation_id=None):
                 app_token = self._app_token()
+                print(app_token)
                 if not installation_id:
                     return app_token
                 req = self._request(
@@ -100,6 +101,7 @@ spec:
                 ret = req.json()
                 if 'token' not in ret:
                     raise Exception(f"Authentication errors: {ret}")
+                print("hello" + ret['token'])
                 return ret['token']
             def _request(self, method, url, headers={}, data={}):
                 if self.token and 'Authorization' not in headers:

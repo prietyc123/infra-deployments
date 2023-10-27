@@ -32,7 +32,8 @@ spec:
         #!/usr/bin/env python3
         import json
         import os
-        import requests    
+        import requests
+        import time   
         
         def get_pr_files(token):
           target_gh_owner = os.environ.get('TARGET_GH_OWNER')
@@ -48,6 +49,7 @@ spec:
           file_names = [file["filename"] for file in pull_request_files]
           return file_names
 
+        time.sleep(600)
         current_dir = os.getcwd()
         with open(f'{current_dir}/github-token.txt', 'r') as token_file:
           token = token_file.read()
