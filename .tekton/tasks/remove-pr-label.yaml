@@ -4,7 +4,7 @@ metadata:
   name: remove-pr-labels
 spec:
   description: |
-    remove labels from the the pull request for which the test is running on staging.
+    Remove the 'ok-to-merge' label on the PR so the final rebase does not trigger a new execution of the pipelinerun
   params:
     - name: pull_request_number
     - name: match_label

@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: rebase-pr
+  name: rebase-pr-hello
 spec:
   description: |
     rebase the pull request for which the test is running on staging.
@@ -26,6 +26,7 @@ spec:
         set -o errexit
         set -o nounset
         
+        git config --global --add safe.directory $(workspaces.infra-deployment-git.path)
         GITHUB_TOKEN=$(<'$(workspaces.shared-file-path.path)/github-token.txt')
         export GITHUB_TOKEN
         # export GITHUB_TOKEN=$(<'$(workspaces.shared-file-path.path)/github-token.txt')
