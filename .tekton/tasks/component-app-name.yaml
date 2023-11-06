@@ -8,7 +8,7 @@ spec:
      description: This is the file which contains the argocd application names running as per the component.
      default: "staging-app.yaml"
   description: >-
-    This task is for syncing the staging cluster argocd application
+    This task is to find out which applicationset needs to be updated for the staging cluster argocd application
   workspaces:
    - name: infra-deployment-git
    - name: shared-file-path

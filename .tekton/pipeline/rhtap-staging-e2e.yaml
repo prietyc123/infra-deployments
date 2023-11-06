@@ -28,13 +28,16 @@ spec:
           value: "ok-to-merge"
       runAfter:
         - get-github-token
+        - clone-infra-deployment-git
       workspaces:
         - name: shared-file-path
           workspace: shared-file
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
     - name: clone-infra-deployment-git
       taskRef:
         name: git-clone
-        kind: ClusterRask
       params:
         - name: url
           value: $(params.repo_url)
@@ -44,12 +47,6 @@ spec:
           value: $(params.revision)
         - name: depth
           value: "3"
-      runAfter:
-        - check-merge-label
-      when:
-        - input: $(tasks.check-merge-label.results.matched-merge-label)
-          operator: in
-          values: ["True"]
       workspaces:
       - name: output
         workspace: git
@@ -61,7 +58,7 @@ spec:
         - name: pull_request_number
           value: $(params.pull_request_number)
       runAfter:
-        - clone-infra-deployment-git
+        - check-merge-label
       when:
         - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
@@ -84,7 +81,7 @@ spec:
           values: ["True"]
       runAfter:
         - get-pr-modified-files
-    - name: check-rebase-label
+    - name: check-rebase-label-pre-test
       taskRef:
         name: pr-rebase-labels
       params:
@@ -101,7 +98,10 @@ spec:
       workspaces:
         - name: shared-file-path
           workspace: shared-file
-    - name: rebase-pr
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
+    - name: rebase-pr-pre-test
       taskRef:
         name: rebase-pr
       params:
@@ -113,14 +113,14 @@ spec:
         - name: shared-file-path
           workspace: shared-file
       when:
-        - input: $(tasks.check-rebase-label.results.matched-rebase-label)
+        - input: $(tasks.check-rebase-label-pre-test.results.matched-rebase-label)
           operator: in
           values: ["True"]
         - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
           values: ["True"]
       runAfter:
-        - check-rebase-label
+        - check-rebase-label-pre-test
     - name: replace-revision
       taskRef:
         name: replace-revision
@@ -134,7 +134,7 @@ spec:
         - name: shared-file-path
           workspace: shared-file
       when:
-        - input: $(tasks.check-rebase-label.results.matched-rebase-label)
+        - input: $(tasks.check-rebase-label-pre-test.results.matched-rebase-label)
           operator: in
           values: ["False"]
         - input: $(tasks.check-merge-label.results.matched-merge-label)
@@ -142,7 +142,7 @@ spec:
           values: ["True"]
       runAfter:
         - changed-component-app-name
-        - check-rebase-label
+        - check-rebase-label-pre-test
     - name: clone-stage-e2e-git
       taskRef:
         name: git-clone
@@ -180,7 +180,7 @@ spec:
         - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
           values: ["True"]
-    - name: check-rebase-label-2
+    - name: check-rebase-label-post-test
       taskRef:
         name: pr-rebase-labels
       params:
@@ -197,6 +197,9 @@ spec:
       workspaces:
         - name: shared-file-path
           workspace: shared-file
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
     - name: remove-merge-label
       taskRef:
         name: remove-pr-labels
@@ -206,7 +209,7 @@ spec:
         - name: pull_request_number
           value: $(params.pull_request_number)
       when:
-        - input: $(tasks.check-rebase-label-2.results.matched-rebase-label)
+        - input: $(tasks.check-rebase-label-post-test.results.matched-rebase-label)
           operator: in
           values: ["True"]
         - input: $(tasks.check-merge-label.results.matched-merge-label)
@@ -216,8 +219,8 @@ spec:
         - name: shared-file-path
           workspace: shared-file
       runAfter:
-        - check-rebase-label-2
-    - name: rebase-pr-3
+        - check-rebase-label-post-test
+    - name: rebase-pr-post-test
       taskRef:
         name: rebase-pr
       params:
@@ -234,7 +237,7 @@ spec:
         - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
           values: ["True"]
-        - input: $(tasks.check-rebase-label-2.results.matched-rebase-label)
+        - input: $(tasks.check-rebase-label-post-test.results.matched-rebase-label)
           operator: in
           values: ["True"]
   finally:

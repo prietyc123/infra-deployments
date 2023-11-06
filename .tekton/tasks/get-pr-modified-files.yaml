@@ -4,7 +4,7 @@ metadata:
   name: get-pr-modified-files
 spec:
   description: >-
-    This task is for getting all the filepath changed for pull request
+    This task retrieves the file paths modified by the pull request
   params:
     - name: pull_request_number
     - name: TARGET_GH_OWNER
