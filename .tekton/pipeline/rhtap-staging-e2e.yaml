@@ -15,9 +15,14 @@ spec:
     - name: get-github-token
       taskRef:
         name: get-github-token
+      runAfter:
+        - clone-infra-deployment-git
       workspaces:
         - name: shared-file-path
           workspace: shared-file
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
     - name: check-merge-label
       taskRef:
         name: pr-labels
@@ -54,9 +59,6 @@ spec:
     - name: get-pr-modified-files
       taskRef:
         name: get-pr-modified-files
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
       runAfter:
         - check-merge-label
       when:
@@ -64,6 +66,9 @@ spec:
           operator: in
           values: ["True"]
       workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
         - name: shared-file-path
           workspace: shared-file
     - name: changed-component-app-name
@@ -84,11 +89,6 @@ spec:
     - name: check-rebase-label-pre-test
       taskRef:
         name: pr-rebase-labels
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
-        - name: match_label
-          value: "needs-rebase"
       runAfter:
         - get-pr-modified-files
       when:
@@ -96,8 +96,6 @@ spec:
           operator: in
           values: ["True"]
       workspaces:
-        - name: shared-file-path
-          workspace: shared-file
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
@@ -183,11 +181,6 @@ spec:
     - name: check-rebase-label-post-test
       taskRef:
         name: pr-rebase-labels
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
-        - name: match_label
-          value: "needs-rebase"
       runAfter:
         - stage-verify-e2e-test
       when:
@@ -195,8 +188,6 @@ spec:
           operator: in
           values: ["True"]
       workspaces:
-        - name: shared-file-path
-          workspace: shared-file
         - name: infra-deployment-git
           workspace: git
           subPath: infra-deployment-git
