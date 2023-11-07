@@ -1,14 +1,13 @@
 # get_github_token.py
+import argparse
 import json
 import os
 import time
-import base64
-import subprocess
 import requests
 from jwcrypto import jwk, jwt
 
 EXPIRE_MINUTES_AS_SECONDS = int(os.environ.get('GITHUBAPP_TOKEN_EXPIRATION_MINUTES', 10)) * 60
-GITHUB_API_URL = os.environ.get('GITHUB_API_URL')
+GITHUB_API_URL = os.environ.get('GITHUB_API_URL', "https://api.github.com")
 
 class GitHub():
     token = None
@@ -65,21 +64,29 @@ class GitHub():
     def get_git_token(self):
         return self.token
 
-def main():
-    with open(os.environ['GITHUBAPP_KEY_PATH'], 'rb') as key_file:
+def main(args):
+    with open(args.private_key_path, 'rb') as key_file:
         key = key_file.read()
-    if os.environ.get('GITHUBAPP_APP_ID'):
-        app_id = os.environ['GITHUBAPP_APP_ID']
+    if args.git_app_id:
+        app_id = args.git_app_id
     else:
         raise Exception("application id is not set")
     print(f"Getting user token for application_id: {app_id}")
     github_app = GitHub(
         key,
         app_id=app_id,
-        installation_id=os.environ.get('GITHUBAPP_INSTALLATION_ID'))
+        installation_id=args.git_installation_id)
     git_token = github_app.get_git_token()
-    with open('github-token.txt', "w") as f:
+    with open(args.token_path, "w") as f:
         f.write(git_token)
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="get github app token")
+    parser.add_argument("--private-key-path", "-p", required=True)
+    parser.add_argument("--git-app-id", "-i", required=True)
+    parser.add_argument("--git-installation-id", "-I", required=True)
+    parser.add_argument("--token-path", "-T", required=True)
+    return parser.parse_args()
+
 if __name__ == '__main__':
-    main()
+    main(parse_args())
