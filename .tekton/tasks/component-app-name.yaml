@@ -5,7 +5,7 @@ metadata:
 spec:
   params:
    - name: APP_FILE_NAME
-     description: This is the file which contains the argocd application names running as per the component.
+     description: This is the file which contains the argocd applicationset names running as per the component.
      default: "staging-app.yaml"
   description: >-
     This task is to find out which applicationset needs to be updated for the staging cluster argocd application
@@ -20,44 +20,9 @@ spec:
         - name: APP_FILE_NAME
           value: $(params.APP_FILE_NAME)
       script: |
-        #!/usr/bin/env python3
-        import subprocess
-        import re
-        import os
+        #!/usr/bin/env bash
+        set -eufx
 
-        cmd = "pip3 install pyyaml"
-        output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = output.communicate()
+        default_appset_file="$(pwd)/${APP_FILE_NAME}"
 
-        APP_FILE_NAME = os.environ.get('APP_FILE_NAME')
-
-        # Get the current working directory
-        current_dir = os.getcwd()
-
-        # Load applications file
-        with open(f'{current_dir}/{APP_FILE_NAME}') as f:
-          import yaml
-          applications = yaml.safe_load(f)
-
-        keys_pattern = r"\b(" + "|".join(re.escape(key) for key in applications.keys()) + r")\b"
-
-        # Print the list of file paths
-        apps = []
-        for file in open("$(workspaces.shared-file-path.path)/updated_files.txt").readlines():
-          file = file.strip()
-          path_matches = re.findall(keys_pattern, file)
-          apps.extend(path_matches)
-
-        # Find app match in pull request files
-        unique_apps = set(apps)
-
-        def update_app_path(app_path, app_name):
-          with open(app_path, "a") as f:
-            f.write(app_name + "\n")
-
-        if not unique_apps:
-            print(f'No matching components found in pull request files. Add them to the {APP_FILE_NAME} file.')
-        else:
-            for app in unique_apps:
-                for app_name in applications.get(app, []):
-                  update_app_path("$(workspaces.shared-file-path.path)/component.txt", app + ":" + app_name)
+        python .tekton/hack/get-component-name.py --filepath ${default_appset_file} --app-fiepath "$(workspaces.shared-file-path.path)/component.txt" --pr-filepath "$(workspaces.shared-file-path.path)/updated_files.txt"
