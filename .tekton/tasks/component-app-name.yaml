@@ -25,4 +25,10 @@ spec:
 
         default_appset_file="$(pwd)/${APP_FILE_NAME}"
 
-        python .tekton/hack/get-component-name.py --filepath ${default_appset_file} --app-fiepath "$(workspaces.shared-file-path.path)/component.txt" --pr-filepath "$(workspaces.shared-file-path.path)/updated_files.txt"
+        if pip3 install pyyaml 2>&1; then
+          echo "PyYAML installed successfully"
+        else
+          echo "Error running 'pip3 install pyyaml': $?"
+        fi
+
+        python .tekton/hack/get-component-name.py --filepath ${default_appset_file} --app-filepath "$(workspaces.shared-file-path.path)/component.txt" --pr-filepath "$(workspaces.shared-file-path.path)/updated_files.txt"

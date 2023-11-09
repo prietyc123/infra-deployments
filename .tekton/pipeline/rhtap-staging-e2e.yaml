@@ -102,12 +102,10 @@ spec:
     - name: rebase-pr-pre-test
       taskRef:
         name: rebase-pr
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
-        - name: source_branch
-          value: $(params.source_branch)
       workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
         - name: shared-file-path
           workspace: shared-file
       when:
@@ -175,6 +173,9 @@ spec:
         - replace-revision
         - clone-stage-e2e-git
       when:
+        - input: $(tasks.check-rebase-label-pre-test.results.matched-rebase-label)
+          operator: in
+          values: ["False"]
         - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
           values: ["True"]
@@ -184,6 +185,9 @@ spec:
       runAfter:
         - stage-verify-e2e-test
       when:
+        - input: $(tasks.check-rebase-label-pre-test.results.matched-rebase-label)
+          operator: in
+          values: ["False"]
         - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
           values: ["True"]
@@ -209,17 +213,18 @@ spec:
       workspaces:
         - name: shared-file-path
           workspace: shared-file
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
       runAfter:
         - check-rebase-label-post-test
     - name: rebase-pr-post-test
       taskRef:
         name: rebase-pr
-      params:
-        - name: pull_request_number
-          value: $(params.pull_request_number)
-        - name: source_branch
-          value: $(params.source_branch)
       workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
         - name: shared-file-path
           workspace: shared-file
       runAfter:
@@ -231,14 +236,6 @@ spec:
         - input: $(tasks.check-rebase-label-post-test.results.matched-rebase-label)
           operator: in
           values: ["True"]
-  finally:
-    - name: revert-replace-revision
-      taskRef:
-        name: revert-replace-revision
-      when:
-        - input: $(tasks.check-merge-label.results.matched-merge-label)
-          operator: in
-          values: ["True"]
     - name: merge-pr
       taskRef:
         name: merge-pr
@@ -248,12 +245,22 @@ spec:
         - name: source_branch
           value: $(params.source_branch)
       workspaces:
+        - name: infra-deployment-git
+          workspace: git
+          subPath: infra-deployment-git
         - name: shared-file-path
           workspace: shared-file
+      runAfter:
+        - rebase-pr-post-test
       when:
-        - input: $(tasks.stage-verify-e2e-test.status)
+        - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
-          values: ["Succeeded"]
+          values: ["True"]
+  finally:
+    - name: revert-replace-revision
+      taskRef:
+        name: revert-replace-revision
+      when:
         - input: $(tasks.check-merge-label.results.matched-merge-label)
           operator: in
           values: ["True"]
