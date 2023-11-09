@@ -9,30 +9,12 @@ spec:
     - name: pr_branch_revision
   workspaces:
    - name: shared-file-path
+   - name: infra-deployment-git
   steps:
     - name: replace-target-revision
       image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-      workingDir: $(workspaces.shared-file-path.path)
-      script: |
-        #!/usr/bin/env sh
-        set -o errexit
-        set -o nounset
-        set -o pipefail
-
-        echo "Disable auto sync for all-application-sets"
-        oc patch applications.argoproj.io/all-application-sets -n openshift-gitops --type json --patch='[ { "op": "remove", "path": "/spec/syncPolicy/automated" } ]'
-
-        # Read each line from the component file, which has all the application details from sync app task e.g {pipeline-service: pipeline-service-stone-stg-m01}
-        while IFS= read -r line
-        do
-          component="$line"
-          component=$(echo -e "$component" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-          
-          # Set the delimiter to separate componentapp and app name
-          IFS=":"
-          read -ra app <<< "$component"
-          echo "Replace revision for changed components ${app[0]} application set"
-          oc patch applicationsets.argoproj.io/${app[1]} -n openshift-gitops --type json --patch='[ { "op": "replace", "path": "/spec/template/spec/source/targetRevision", "value": "$(params.pr_branch_revision)" } ]'
-
-        done < component.txt
-   
+      workingDir: $(workspaces.infra-deployment-git.path)
+      command:
+        - /bin/bash
+        - -c
+        - ".tekton/hack/update-argocd-app-revision.sh --branch $(params.pr_branch_revision) --filepath $(workspaces.shared-file-path.path)/component.txt"

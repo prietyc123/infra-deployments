@@ -2,42 +2,47 @@
 import argparse
 import subprocess
 import re
-import os
 
 def update_app_path(app_path, app_name):
     with open(app_path, "a") as f:
         f.write(app_name + "\n")
 
 def main(args):
-    cmd = "pip3 install pyyaml"
-    output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stdout, stderr = output.communicate()
+    try:
+        cmd = "pip3 install pyyaml"
+        output = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, stderr = output.communicate()
 
-    APP_FILE_NAME = args.filepath
+        if output.returncode != 0:
+            raise Exception(f"Error running 'pip3 install pyyaml': {stderr.decode()}")
 
-    # Load applicationset file
-    with open('{APP_FILE_NAME}') as f:
-        import yaml
-        applications = yaml.safe_load(f)
+        APP_FILE_NAME = args.filepath
 
-    keys_pattern = r"\b(" + "|".join(re.escape(key) for key in applications.keys()) + r")\b"
+        # Load applicationset file
+        with open(APP_FILE_NAME) as f:
+            import yaml
+            applications = yaml.safe_load(f)
 
-    # Print the list of file paths
-    apps = []
-    for file in open(args.pr_filepath).readlines():
-        file = file.strip()
-        path_matches = re.findall(keys_pattern, file)
-        apps.extend(path_matches)
+        keys_pattern = r"\b(" + "|".join(re.escape(key) for key in applications.keys()) + r")\b"
 
-    # Find app match in pull request files
-    unique_apps = set(apps)
+        # Print the list of file paths
+        apps = []
+        for file in open(args.pr_filepath).readlines():
+            file = file.strip()
+            path_matches = re.findall(keys_pattern, file)
+            apps.extend(path_matches)
 
-    if not unique_apps:
-        print(f'No matching components found in pull request files. Add them to the {APP_FILE_NAME} file.')
-    else:
-        for app in unique_apps:
-            for app_name in applications.get(app, []):
-                update_app_path(args.app_fiepath, app + ":" + app_name)
+        # Find app match in pull request files
+        unique_apps = set(apps)
+
+        if not unique_apps:
+            print(f'No matching components found in pull request files. Add them to the {APP_FILE_NAME} file.')
+        else:
+            for app in unique_apps:
+                for app_name in applications.get(app, []):
+                    update_app_path(args.app_fiepath, app + ":" + app_name)
+    except Exception as e:
+        print(f"Error while updating the applicationset name into file: {str(e)}")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="update a file with all the applicationsets for application changed in PR")
