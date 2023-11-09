@@ -20,7 +20,7 @@ spec:
         git config --global --add safe.directory $(pwd)
         git fetch
         if [ "$(git log HEAD ..origin/ImprovedPromotionPoc | wc -l)" == "0" ]; then
-          echo "False" > '$(results.matched-rebase-label.path)'
+          echo -n "False" > "$(results.matched-rebase-label.path)"
         else
-          echo "True" > '$(results.matched-rebase-label.path)'
+          echo -n "True" > "$(results.matched-rebase-label.path)"
         fi

@@ -35,4 +35,4 @@ spec:
 
         token=$(cat '$(workspaces.shared-file-path.path)/github-token.txt')
 
-        python .tekton/hack/check-pr-label.py --token ${token} --label "$(params.match_label)" -f '$(results.matched-merge-label.path)' -o ${TARGET_GH_OWNER} -r ${TARGET_GH_REPO} -n ${PULL_REQUEST_NUMBER}
+        ".tekton/hack/check-pr-label.py --token ${token} --label '$(params.match_label)' -f '$(results.matched-merge-label.path)' -o ${TARGET_GH_OWNER} -r ${TARGET_GH_REPO} -n ${PULL_REQUEST_NUMBER}"
